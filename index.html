@@ -39,6 +39,18 @@ let currentUser = null;
 let isAdmin = false;
 let allScripts = [];
 
+// Handle redirect result (mobile)
+getRedirectResult(auth).then((result) => {
+  if (result?.user) {
+    // User just returned from redirect sign-in
+    currentUser = result.user;
+    isAdmin = currentUser.email === ADMIN_EMAIL;
+    updateAuthUI();
+    loadScripts();
+    document.getElementById('loginWall').classList.remove('show');
+  }
+}).catch((e) => { console.error(e); });
+
 // AUTH STATE
 onAuthStateChanged(auth, async (user) => {
   currentUser = user;
@@ -55,18 +67,22 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 window.signIn = async () => {
-  try {
-    const result = await signInWithPopup(auth, provider);
-    if (result?.user) {
-      document.getElementById('loginWall').classList.remove('show');
-    }
-  } catch(e) {
-    if (e.code === 'auth/popup-blocked') {
-      showToast('من فضلك اسمح للبوب أب في المتصفح وحاول تاني');
-    } else {
+  // Mobile = redirect, Desktop = popup
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if (isMobile) {
+    try {
+      await signInWithRedirect(auth, provider);
+    } catch(e) {
       showToast('حدث خطأ — حاول تاني');
     }
-    console.error(e);
+  } else {
+    try {
+      await signInWithPopup(auth, provider);
+    } catch(e) {
+      // fallback to redirect if popup blocked
+      try { await signInWithRedirect(auth, provider); }
+      catch(e2) { showToast('حدث خطأ — حاول تاني'); }
+    }
   }
 };
 
