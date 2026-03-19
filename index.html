@@ -45,40 +45,28 @@ onAuthStateChanged(auth, async (user) => {
   isAdmin = user?.email === ADMIN_EMAIL;
   updateAuthUI();
   if (user) {
+    document.getElementById('loginWall').classList.remove('show');
     loadScripts();
   } else {
     allScripts = [];
     renderGrid();
-    // Show login wall only if not in middle of redirect
-    const pendingRedirect = sessionStorage.getItem('pendingRedirect');
-    if (!pendingRedirect) {
-      document.getElementById('loginWall').classList.add('show');
-    }
+    document.getElementById('loginWall').classList.add('show');
   }
-});
-
-// SIGN IN — handle redirect result first
-getRedirectResult(auth).then((result) => {
-  sessionStorage.removeItem('pendingRedirect');
-  if (result?.user) {
-    currentUser = result.user;
-    isAdmin = currentUser.email === ADMIN_EMAIL;
-    updateAuthUI();
-    loadScripts();
-    document.getElementById('loginWall').classList.remove('show');
-  }
-}).catch((e) => {
-  sessionStorage.removeItem('pendingRedirect');
-  console.error(e);
 });
 
 window.signIn = async () => {
   try {
-    sessionStorage.setItem('pendingRedirect', '1');
-    await signInWithRedirect(auth, provider);
+    const result = await signInWithPopup(auth, provider);
+    if (result?.user) {
+      document.getElementById('loginWall').classList.remove('show');
+    }
   } catch(e) {
-    sessionStorage.removeItem('pendingRedirect');
-    showToast('حدث خطأ في تسجيل الدخول');
+    if (e.code === 'auth/popup-blocked') {
+      showToast('من فضلك اسمح للبوب أب في المتصفح وحاول تاني');
+    } else {
+      showToast('حدث خطأ — حاول تاني');
+    }
+    console.error(e);
   }
 };
 
@@ -175,6 +163,7 @@ window.deleteScript = async (id, e) => {
 
 // OPEN SCRIPT
 window.openDynScript = (id) => {
+  if (!currentUser) { showToast('سجل دخولك أولاً عشان تقدر تفتح السكريبت'); return; }
   const s = allScripts.find(x => x.id === id);
   if (!s) return;
 
@@ -323,7 +312,10 @@ window.closeModal = (id) => {
 };
 window.openAddModal = () => { if(isAdmin) document.getElementById('addModal').classList.add('open'); };
 window.closeAddModal = () => document.getElementById('addModal').classList.remove('open');
-window.openBuiltIn = () => { openModal('builtInModal'); initBuiltInScroll(); };
+window.openBuiltIn = () => {
+  if (!currentUser) { showToast('سجل دخولك أولاً عشان تقدر تفتح السكريبت'); return; }
+  openModal('builtInModal'); initBuiltInScroll();
+};
 
 function resetForm() {
   document.getElementById('fTitle').value = '';
@@ -1094,6 +1086,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 <script>
 function openSuperLeague() {
+  if (!currentUser) { showToast('سجل دخولك أولاً عشان تقدر تفتح السكريبت'); return; }
   document.getElementById('slModal').classList.add('open');
   document.body.style.overflow = 'hidden';
 }
