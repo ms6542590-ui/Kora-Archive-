@@ -279,9 +279,14 @@ window.filter = (cat, btn) => {
   document.querySelectorAll('.fb').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
 
-  // built-in card filter
+  // filter static cards by their data-cat
   const builtIn = document.getElementById('builtInCard');
-  if (builtIn) builtIn.classList.toggle('hidden', cat !== 'all' && cat !== 'وثائقي');
+  const slCard  = document.getElementById('slCard');
+  const wcCard  = document.getElementById('wcCard');
+
+  if (builtIn) builtIn.classList.toggle('hidden', cat !== 'all' && builtIn.getAttribute('data-cat') !== cat);
+  if (slCard)  slCard.classList.toggle('hidden',  cat !== 'all' && slCard.getAttribute('data-cat')  !== cat);
+  if (wcCard)  wcCard.classList.toggle('hidden',  cat !== 'all' && wcCard.getAttribute('data-cat')  !== cat);
 
   renderGrid();
 };
@@ -696,7 +701,7 @@ footer{border-top:1px solid var(--border);padding:26px 50px;display:flex;align-i
 
   <!-- SUPER LEAGUE CARD -->
 
-  <div class="card" data-cat="تحليل" onclick="openSuperLeague()" style="animation-delay:0.2s">
+  <div class="card" id="slCard" data-cat="تحليل" onclick="openSuperLeague()" style="animation-delay:0.2s">
     <div class="card-thumb" style="position:relative;">
       <div style="position:absolute;inset:0;background:#050508;overflow:hidden;">
         <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.025) 1px,transparent 1px);background-size:50px 50px;"></div>
@@ -743,7 +748,7 @@ footer{border-top:1px solid var(--border);padding:26px 50px;display:flex;align-i
 
   <!-- WORLD CUP 2026 CARD -->
 
-  <div class="card" data-cat="تحليل" onclick="openWC2026()" style="animation-delay:0.3s">
+  <div class="card" id="wcCard" data-cat="تحليل" onclick="openWC2026()" style="animation-delay:0.3s">
     <div class="card-thumb" style="position:relative;">
       <div style="position:absolute;inset:0;background:#050a08;overflow:hidden;">
         <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.025) 1px,transparent 1px);background-size:50px 50px;"></div>
