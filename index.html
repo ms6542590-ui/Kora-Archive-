@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
@@ -7,9 +8,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;900&family=Playfair+Display:ital,wght@0,700;1,400&display=swap" rel="stylesheet">
 
 <!-- Firebase -->
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
-import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut }
+import { getAuth, signInWithRedirect, signInWithPopup, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, signOut }
   from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
 import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, setDoc, getDoc, onSnapshot, query, orderBy }
   from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
@@ -46,10 +48,28 @@ onAuthStateChanged(auth, async (user) => {
   else { allScripts = []; renderGrid(); }
 });
 
-// SIGN IN
+// SIGN IN — handle redirect result first
+getRedirectResult(auth).then((result) => {
+  if (result?.user) {
+    currentUser = result.user;
+    isAdmin = currentUser.email === ADMIN_EMAIL;
+    updateAuthUI();
+    loadScripts();
+  }
+}).catch((e) => {
+  console.error(e);
+  showToast('حدث خطأ في تسجيل الدخول');
+});
+
 window.signIn = async () => {
-  try { await signInWithPopup(auth, provider); }
-  catch(e) { showToast('حدث خطأ في تسجيل الدخول'); }
+  try {
+    // try popup first, fallback to redirect
+    await signInWithPopup(auth, provider);
+  } catch(e) {
+    // if popup blocked, use redirect
+    try { await signInWithRedirect(auth, provider); }
+    catch(e2) { showToast('حدث خطأ في تسجيل الدخول'); }
+  }
 };
 
 // SIGN OUT
@@ -573,10 +593,12 @@ footer{border-top:1px solid var(--border);padding:26px 50px;display:flex;align-i
   .frow2{grid-template-columns:1fr;}
 }
 </style>
+
 </head>
 <body>
 
 <!-- NAV -->
+
 <nav>
   <div class="nav-logo">
     <div class="nav-logo-icon">⚽</div>
@@ -589,25 +611,29 @@ footer{border-top:1px solid var(--border);padding:26px 50px;display:flex;align-i
     <div class="nav-stat"><strong id="navCount">1</strong>سكريبت</div>
     <div class="nav-div"></div>
 
-    <!-- LOGIN BTN -->
-    <button class="btn-login" id="loginBtn" onclick="signIn()">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-      دخول بـ Google
-    </button>
+```
+<!-- LOGIN BTN -->
+<button class="btn-login" id="loginBtn" onclick="signIn()">
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+  دخول بـ Google
+</button>
 
-    <!-- USER AREA -->
-    <div class="user-area" id="userArea">
-      <span class="admin-badge" id="adminBadge" style="display:none;">ADMIN</span>
-      <img class="user-avatar" id="userAvatar" src="" alt="">
-      <span class="user-name" id="userName"></span>
-      <button class="btn-logout" onclick="signOut_()">خروج</button>
-    </div>
+<!-- USER AREA -->
+<div class="user-area" id="userArea">
+  <span class="admin-badge" id="adminBadge" style="display:none;">ADMIN</span>
+  <img class="user-avatar" id="userAvatar" src="" alt="">
+  <span class="user-name" id="userName"></span>
+  <button class="btn-logout" onclick="signOut_()">خروج</button>
+</div>
 
-    <button class="btn-nav" id="addNavBtn" onclick="openAddModal()">+ سكريبت جديد</button>
+<button class="btn-nav" id="addNavBtn" onclick="openAddModal()">+ سكريبت جديد</button>
+```
+
   </div>
 </nav>
 
 <!-- HERO -->
+
 <div class="hero">
   <div class="hero-label">مكتبة السكريبتات</div>
   <h1 class="hero-title">أرشيف <em>قصص</em><br>الكورة</h1>
@@ -615,6 +641,7 @@ footer{border-top:1px solid var(--border);padding:26px 50px;display:flex;align-i
 </div>
 
 <!-- FILTER -->
+
 <div class="filter-bar">
   <button class="fb active" onclick="filter('all',this)">الكل</button>
   <button class="fb" onclick="filter('وثائقي',this)">وثائقي</button>
@@ -623,9 +650,11 @@ footer{border-top:1px solid var(--border);padding:26px 50px;display:flex;align-i
 </div>
 
 <!-- GRID -->
+
 <div class="grid" id="grid">
 
   <!-- BUILT-IN CARD -->
+
   <div class="card" id="builtInCard" data-cat="وثائقي" onclick="openBuiltIn()">
     <div class="card-thumb">
       <div class="thumb-bg" style="background:linear-gradient(135deg,#090909,#150808,#1a0a0a);">
@@ -649,9 +678,11 @@ footer{border-top:1px solid var(--border);padding:26px 50px;display:flex;align-i
   </div>
 
   <!-- DYNAMIC CARDS INJECT HERE -->
+
   <div id="dynCards" style="display:contents;"></div>
 
   <!-- ADD CARD (admin only, shown via JS) -->
+
   <div class="card card-add" id="addCardBtn" onclick="openAddModal()" style="display:none;">
     <div class="add-circle">+</div>
     <div class="add-lbl">سكريبت جديد</div>
@@ -660,6 +691,7 @@ footer{border-top:1px solid var(--border);padding:26px 50px;display:flex;align-i
 </div>
 
 <!-- LOGIN WALL (shown when not logged in) -->
+
 <div class="login-wall" id="loginWall">
   <div class="lw-icon">🔐</div>
   <div class="lw-title">سجل دخولك لتصفح الأرشيف</div>
@@ -676,6 +708,7 @@ footer{border-top:1px solid var(--border);padding:26px 50px;display:flex;align-i
 </footer>
 
 <!-- ══ BUILT-IN MODAL (Ahmed Refaat) ══ -->
+
 <div class="modal" id="builtInModal">
   <div class="modal-bg"></div>
   <div class="modal-panel">
@@ -740,6 +773,7 @@ footer{border-top:1px solid var(--border);padding:26px 50px;display:flex;align-i
 </div>
 
 <!-- ══ DYNAMIC VIEWER ══ -->
+
 <div class="modal" id="dynModal">
   <div class="modal-bg"></div>
   <div class="modal-panel">
@@ -761,6 +795,7 @@ footer{border-top:1px solid var(--border);padding:26px 50px;display:flex;align-i
 </div>
 
 <!-- ══ LOCKED MODAL ══ -->
+
 <div class="locked-modal" id="lockedModal">
   <div class="locked-bg" onclick="closeModal('lockedModal')"></div>
   <div class="locked-box">
@@ -773,6 +808,7 @@ footer{border-top:1px solid var(--border);padding:26px 50px;display:flex;align-i
 </div>
 
 <!-- ══ ADD MODAL ══ -->
+
 <div class="add-modal" id="addModal">
   <div class="add-modal-bg" onclick="closeAddModal()"></div>
   <div class="add-box">
