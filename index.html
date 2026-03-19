@@ -39,40 +39,39 @@ let currentUser = null;
 let isAdmin = false;
 let allScripts = [];
 
-// Handle redirect result - runs when user comes back from Google
-getRedirectResult(auth).then((result) => {
-  if (result?.user) {
-    currentUser = result.user;
-    isAdmin = currentUser.email === ADMIN_EMAIL;
-    updateAuthUI();
-    loadScripts();
-    document.getElementById('loginWall').classList.remove('show');
-    sessionStorage.removeItem('signingIn');
-  }
-}).catch((e) => {
-  sessionStorage.removeItem('signingIn');
-  console.error(e);
-});
-
-// AUTH STATE - fires on page load with current user status
-onAuthStateChanged(auth, async (user) => {
+// ══ AUTH ══
+// onAuthStateChanged is the ONLY source of truth
+// It fires automatically when user signs in via redirect
+onAuthStateChanged(auth, (user) => {
   currentUser = user;
   isAdmin = user?.email === ADMIN_EMAIL;
-  updateAuthUI();
+
   if (user) {
-    document.getElementById('loginWall').classList.remove('show');
+    // ✅ مسجل
     sessionStorage.removeItem('signingIn');
-    loadScripts();
+    updateAuthUI();
+    document.getElementById('loginWall').classList.remove('show');
+    if (allScripts.length === 0) loadScripts();
   } else {
-    // Only show login wall if NOT in middle of redirect
-    const signingIn = sessionStorage.getItem('signingIn');
-    if (!signingIn) {
-      allScripts = [];
-      renderGrid();
+    // ❌ مش مسجل
+    updateAuthUI();
+    // لو مش بيعمل redirect دلوقتي — بيين login wall
+    if (!sessionStorage.getItem('signingIn')) {
       document.getElementById('loginWall').classList.add('show');
     }
   }
 });
+
+// Handle returning from Google redirect
+getRedirectResult(auth)
+  .then((result) => {
+    sessionStorage.removeItem('signingIn');
+    // onAuthStateChanged handles the UI update automatically
+  })
+  .catch((e) => {
+    sessionStorage.removeItem('signingIn');
+    console.error('redirect error:', e);
+  });
 
 window.signIn = async () => {
   try {
@@ -81,7 +80,6 @@ window.signIn = async () => {
   } catch(e) {
     sessionStorage.removeItem('signingIn');
     showToast('حدث خطأ — حاول تاني');
-    console.error(e);
   }
 };
 
