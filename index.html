@@ -11,7 +11,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
-import { getAuth, signInWithRedirect, signInWithPopup, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, signOut }
+import { getAuth, signInWithRedirect, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, signOut }
   from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
 import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, setDoc, getDoc, onSnapshot, query, orderBy }
   from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
@@ -39,50 +39,49 @@ let currentUser = null;
 let isAdmin = false;
 let allScripts = [];
 
-// Handle redirect result (mobile)
+// Handle redirect result - runs when user comes back from Google
 getRedirectResult(auth).then((result) => {
   if (result?.user) {
-    // User just returned from redirect sign-in
     currentUser = result.user;
     isAdmin = currentUser.email === ADMIN_EMAIL;
     updateAuthUI();
     loadScripts();
     document.getElementById('loginWall').classList.remove('show');
+    sessionStorage.removeItem('signingIn');
   }
-}).catch((e) => { console.error(e); });
+}).catch((e) => {
+  sessionStorage.removeItem('signingIn');
+  console.error(e);
+});
 
-// AUTH STATE
+// AUTH STATE - fires on page load with current user status
 onAuthStateChanged(auth, async (user) => {
   currentUser = user;
   isAdmin = user?.email === ADMIN_EMAIL;
   updateAuthUI();
   if (user) {
     document.getElementById('loginWall').classList.remove('show');
+    sessionStorage.removeItem('signingIn');
     loadScripts();
   } else {
-    allScripts = [];
-    renderGrid();
-    document.getElementById('loginWall').classList.add('show');
+    // Only show login wall if NOT in middle of redirect
+    const signingIn = sessionStorage.getItem('signingIn');
+    if (!signingIn) {
+      allScripts = [];
+      renderGrid();
+      document.getElementById('loginWall').classList.add('show');
+    }
   }
 });
 
 window.signIn = async () => {
-  // Mobile = redirect, Desktop = popup
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  if (isMobile) {
-    try {
-      await signInWithRedirect(auth, provider);
-    } catch(e) {
-      showToast('حدث خطأ — حاول تاني');
-    }
-  } else {
-    try {
-      await signInWithPopup(auth, provider);
-    } catch(e) {
-      // fallback to redirect if popup blocked
-      try { await signInWithRedirect(auth, provider); }
-      catch(e2) { showToast('حدث خطأ — حاول تاني'); }
-    }
+  try {
+    sessionStorage.setItem('signingIn', '1');
+    await signInWithRedirect(auth, provider);
+  } catch(e) {
+    sessionStorage.removeItem('signingIn');
+    showToast('حدث خطأ — حاول تاني');
+    console.error(e);
   }
 };
 
