@@ -176,7 +176,6 @@ window.deleteScript = async (id, e) => {
 
 // OPEN SCRIPT
 window.openDynScript = (id) => {
-  if (!currentUser) { showToast('سجل دخولك أولاً عشان تقدر تفتح السكريبت'); return; }
   const s = allScripts.find(x => x.id === id);
   if (!s) return;
 
@@ -325,10 +324,7 @@ window.closeModal = (id) => {
 };
 window.openAddModal = () => { if(isAdmin) document.getElementById('addModal').classList.add('open'); };
 window.closeAddModal = () => document.getElementById('addModal').classList.remove('open');
-window.openBuiltIn = () => {
-  if (!currentUser) { showToast('سجل دخولك أولاً عشان تقدر تفتح السكريبت'); return; }
-  openModal('builtInModal'); initBuiltInScroll();
-};
+window.openBuiltIn = () => { openModal('builtInModal'); initBuiltInScroll(); };
 
 function resetForm() {
   document.getElementById('fTitle').value = '';
@@ -745,6 +741,36 @@ footer{border-top:1px solid var(--border);padding:26px 50px;display:flex;align-i
     </div>
   </div>
 
+  <!-- WORLD CUP 2026 CARD -->
+
+  <div class="card" data-cat="تحليل" onclick="openWC2026()" style="animation-delay:0.3s">
+    <div class="card-thumb" style="position:relative;">
+      <div style="position:absolute;inset:0;background:#050a08;overflow:hidden;">
+        <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.025) 1px,transparent 1px);background-size:50px 50px;"></div>
+        <div style="position:absolute;width:500px;height:500px;right:-100px;top:50%;transform:translateY(-50%);background:radial-gradient(circle,rgba(63,184,100,0.18) 0%,transparent 70%);"></div>
+        <div style="position:absolute;width:300px;height:300px;left:-60px;top:50%;transform:translateY(-50%);background:radial-gradient(circle,rgba(184,149,63,0.15) 0%,transparent 70%);"></div>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:16px;">
+          <div style="font-size:9px;letter-spacing:4px;color:rgba(63,184,100,0.8);margin-bottom:10px;font-family:Cairo,sans-serif;">تحليل · كأس العالم 2026</div>
+          <div style="font-size:42px;line-height:1;">🇪🇬</div>
+          <div style="font-size:22px;font-weight:900;color:#f0ebe3;line-height:1.2;font-family:Cairo,sans-serif;margin-top:8px;">مصر في<br><span style="color:#3fb864;">المونديال</span></div>
+          <div style="font-size:8px;color:rgba(255,255,255,0.3);margin-top:8px;letter-spacing:2px;font-family:Cairo,sans-serif;">بلجيكا · إيران · نيوزيلاندا</div>
+        </div>
+        <div style="position:absolute;bottom:0;left:0;right:0;height:3px;background:linear-gradient(to right,#3fb864,#7dd99a,#3fb864);"></div>
+      </div>
+      <div class="thumb-badge badge-analysis" style="z-index:3;">تحليل</div>
+      <div class="thumb-dur" style="z-index:3;">+12 دقيقة</div>
+      <div class="card-ov"><div class="open-btn">↗</div></div>
+    </div>
+    <div class="card-body">
+      <div class="card-cat-label">كورة عالمية · تحليل</div>
+      <div class="card-main-title">مصر في كأس العالم 2026 — هنعمل إيه؟</div>
+      <div class="card-foot">
+        <div class="card-meta"><span>7 chapter</span></div>
+        <div class="card-arr">↗</div>
+      </div>
+    </div>
+  </div>
+
   <!-- ADD CARD (admin only, shown via JS) -->
 
   <div class="card card-add" id="addCardBtn" onclick="openAddModal()" style="display:none;">
@@ -1099,7 +1125,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 <script>
 function openSuperLeague() {
-  if (!currentUser) { showToast('سجل دخولك أولاً عشان تقدر تفتح السكريبت'); return; }
   document.getElementById('slModal').classList.add('open');
   document.body.style.overflow = 'hidden';
 }
@@ -1112,6 +1137,204 @@ function slGoTo(id, idx) {
   const mc = document.getElementById('slContent');
   if (el && mc) mc.scrollTo({ top: el.offsetTop - 20, behavior: 'smooth' });
   document.querySelectorAll('#slModal .si').forEach((s,i) => s.classList.toggle('active', i===idx));
+}
+</script>
+
+<!-- WORLD CUP 2026 MODAL -->
+
+<div class="modal" id="wcModal">
+  <div class="modal-bg"></div>
+  <div class="modal-panel">
+    <div class="m-bar">
+      <div class="m-bar-l">
+        <button class="m-back" onclick="closeWCModal()">← رجوع</button>
+        <div class="m-sep"></div>
+        <div class="m-bc">الأرشيف <span>/</span> مصر في كأس العالم 2026</div>
+      </div>
+      <div class="m-bar-r">
+        <div class="m-tag">تحليل</div>
+        <button class="btn-x" onclick="closeWCModal()">✕</button>
+      </div>
+    </div>
+    <div class="m-layout">
+      <div class="m-sidebar">
+        <div class="sb-lbl">محتوى السكريبت</div>
+        <div class="si active" onclick="wcGoTo('wc0',0)"><span class="si-n">—</span><span class="si-t">INTRO</span></div>
+        <div class="si" onclick="wcGoTo('wc1',1)"><span class="si-n">01</span><span class="si-t">أمم أفريقيا — الدرس</span></div>
+        <div class="si" onclick="wcGoTo('wc2',2)"><span class="si-n">02</span><span class="si-t">معسكر مارس</span></div>
+        <div class="si" onclick="wcGoTo('wc3',3)"><span class="si-n">03</span><span class="si-t">صلاح ومرموش</span></div>
+        <div class="si" onclick="wcGoTo('wc4',4)"><span class="si-n">04</span><span class="si-t">المجموعة السابعة</span></div>
+        <div class="si" onclick="wcGoTo('wc5',5)"><span class="si-n">05</span><span class="si-t">العالم بيقول إيه؟</span></div>
+        <div class="si" onclick="wcGoTo('wc6',6)"><span class="si-n">06</span><span class="si-t">اللي لازم يحصل</span></div>
+        <div class="si" onclick="wcGoTo('wc7',7)"><span class="si-n">07</span><span class="si-t">لو عدينا — مين بعدين؟</span></div>
+        <div class="si" onclick="wcGoTo('wc8',8)"><span class="si-n">—</span><span class="si-t">الخاتمة</span></div>
+      </div>
+      <div class="m-content" id="wcContent">
+
+```
+    <div class="sc-hero" id="wc0">
+      <div class="sc-ep">سكريبت #003</div>
+      <div class="sc-name">مصر في كأس العالم 2026 — هنعمل إيه؟</div>
+      <div class="sc-badges"><span class="bdg g">+12 دقيقة</span><span class="bdg">7 Chapter</span><span class="bdg">تحليل</span></div>
+    </div>
+
+    <div class="ch-sec">
+      <div class="ch-hdr"><div class="ch-num">00</div><div><div class="ch-main">INTRO</div></div></div>
+      <div class="ch-rule"></div>
+      <div class="i-note">ابدأ بالحدث الأخير مباشرة</div>
+      <div class="sl">"في يناير 2026 — مصر خسرت من السنغال في نص نهائي أمم أفريقيا</div>
+      <div class="sl">هدف واحد — من ماني في الدقيقة 78</div>
+      <div class="sl">الكل اتكلم — الكل انتقد — قالوا صلاح مش كافي — مرموش غايب — المنتخب مش جاهز</div>
+      <div class="sl h">بس في حاجة واحدة محدش قالها:</div>
+      <div class="sl h">المنتخب اللي خسر في نص النهائي ده — هو نفسه اللي رايح المونديال بعد 4 شهور</div>
+      <div class="sl e"></div>
+      <div class="sl">وفي المونديال — محدش هيفكر في السنغال</div>
+      <div class="sl h">السؤال الحقيقي: مصر — في مجموعة بلجيكا وإيران ونيوزيلاندا — هتعمل إيه؟</div>
+      <div class="sl">أنا مش هقولك توقعات — هقولك أرقام وحقايق — وأنت احكم"</div>
+    </div>
+
+    <div class="ch-sec" id="wc1">
+      <div class="ch-hdr"><div class="ch-num">01</div><div><div class="ch-main">أمم أفريقيا — الدرس قبل الامتحان الحقيقي</div></div></div>
+      <div class="ch-rule"></div>
+      <div class="sl">"مصر في أمم أفريقيا وصلت لنص النهائي — ده مش فشل — ده تقدم</div>
+      <div class="sl h">بس اللي حصل في ماتش السنغال كان درس مهم جداً</div>
+      <div class="sl e"></div>
+      <div class="sl">السنغال قطعت كل خطوط الاتصال بين صلاح ومرموش</div>
+      <div class="sl">راقبتهم بشكل لصيق — وعزلتهم عن بعض تماماً</div>
+      <div class="sl h">النتيجة؟ أول تسديدة لمصر على المرمى كانت في الدقيقة 90+5</div>
+      <div class="sl d">ماتش كامل — 95 دقيقة — بدون تسديدة واحدة على المرمى</div>
+      <div class="sl e"></div>
+      <div class="sl">ده مش تقصير في الهجوم — ده ثغرة تكتيكية حقيقية</div>
+      <div class="sl h">لما منتخب يعرف يلغيك بالشكل ده — انت لازم تتطور</div>
+      <div class="sl">والسؤال: هل حسام حسن عنده الإجابة في المونديال؟"</div>
+    </div>
+
+    <div class="ch-sec" id="wc2">
+      <div class="ch-hdr"><div class="ch-num">02</div><div><div class="ch-main">معسكر مارس — وفضيحة التأشيرة</div></div></div>
+      <div class="ch-rule"></div>
+      <div class="sl">"مصر دلوقتي في معسكر مارس — آخر معسكر قبل المونديال تقريباً</div>
+      <div class="sl">كان المفروض تلعب ماتشين — السعودية وإسبانيا</div>
+      <div class="sl">السعودية ماشية — 27 مارس في جدة</div>
+      <div class="sl h">بس إسبانيا — المرشح الأول للمونديال — اتألغت</div>
+      <div class="sl d">السبب؟ مشكلة في التأشيرات</div>
+      <div class="sl e"></div>
+      <div class="sl">في 3 شهور قبل المونديال — اتعكست علينا تأشيرة ودية</div>
+      <div class="sl h">المنتخب المصري بيعاني من نفس المشكلة دايماً</div>
+      <div class="sl">الجهاز الفني شغال — الإدارة مش بنفس المستوى"</div>
+    </div>
+
+    <div class="ch-sec" id="wc3">
+      <div class="ch-hdr"><div class="ch-num">03</div><div><div class="ch-main">صلاح ومرموش — الصورة الحقيقية دلوقتي</div></div></div>
+      <div class="ch-rule"></div>
+      <div class="sl h">"محمد صلاح — شريك في صدارة هداف الدوري الإنجليزي — 19 هدف</div>
+      <div class="sl">67 هدف في تاريخه مع المنتخب</div>
+      <div class="sl h">وفي 2018 — سجل الهدفين المصريين الوحيدين في كأس العالم</div>
+      <div class="sl">مصر في كأس العالم = صلاح — ده مش كلام عاطفي — ده إحصاء"</div>
+      <div class="sl e"></div>
+      <div class="sl h">"عمر مرموش — جوارديولا بدأ يلعب بيه أساسي أكتر</div>
+      <div class="sl">الراجل عايز يثبت إنه يستاهل مكانه في مانشستر سيتي</div>
+      <div class="sl">وكأس العالم هي أكبر واجهة في العالم لأي لاعب</div>
+      <div class="sl h">لما لاعب عنده حاجة يثبتها — بيكون أخطر بكتير"</div>
+    </div>
+
+    <div class="ch-sec" id="wc4">
+      <div class="ch-hdr"><div class="ch-num">04</div><div><div class="ch-main">المجموعة السابعة — بالتفصيل</div></div></div>
+      <div class="ch-rule"></div>
+      <div class="sl h">"بلجيكا — الجيل الذهبي انتهى</div>
+      <div class="sl">في قطر 2022 — خرجوا من الدور الأول في مجموعة المغرب وكرواتيا</div>
+      <div class="sl h">أول ماتش في المونديال — مصر ضد بلجيكا — 15 يونيو في سياتل</div>
+      <div class="sl">ده الماتش اللي هيحدد مسار رحلتنا كلها"</div>
+      <div class="sl e"></div>
+      <div class="sl h">"إيران — مرتبة 20 في العالم</div>
+      <div class="sl">في قطر كانوا في مجموعة إنجلترا وأمريكا — وكادوا يعدوا</div>
+      <div class="sl">فريق منظم — دفاع قوي — ومش بيتفرج عليك تضرب</div>
+      <div class="sl h">ماتش مصر وإيران — 26 يونيو — ممكن يكون الفاصل"</div>
+      <div class="sl e"></div>
+      <div class="sl h">"نيوزيلاندا — الأضعف ورقياً</div>
+      <div class="sl">بس في 2010 عادلوا إيطاليا حامل اللقب</div>
+      <div class="sl d">لو دخلت الماتش ده وانت فاكره سهل — ممكن تبكي</div>
+      <div class="sl h">ماتش مصر ونيوزيلاندا — 21 يونيو في فانكوفر — الماتش اللي ما ينفعش نخسره"</div>
+    </div>
+
+    <div class="ch-sec" id="wc5">
+      <div class="ch-hdr"><div class="ch-num">05</div><div><div class="ch-main">العالم بيقول إيه؟</div></div></div>
+      <div class="ch-rule"></div>
+      <div class="sl h">"ESPN — NBC Sports — المحللين الكبار</div>
+      <div class="sl">معظمهم بيقولوا نفس الجملة: بلجيكا أولى — ومصر تانية</div>
+      <div class="sl h">يعني العالم بيراهن إننا نعدي الدور الأول</div>
+      <div class="sl e"></div>
+      <div class="sl">حتى الصحف البلجيكية بعد القرعة قالت:</div>
+      <div class="sl h">أقوى منافس لبلجيكا هو مصر — بسبب صلاح ومرموش</div>
+      <div class="sl d">يعني خصمنا محترمنا أكتر مننا إحنا"</div>
+      <div class="sl e"></div>
+      <div class="sl h">"بس في رقم واحد لازم نتكلم فيه بصراحة:</div>
+      <div class="sl">مصر لعبت 3 نسخ في كأس العالم — ما فازتش في ماتش غير مرة واحدة في 1934</div>
+      <div class="sl h">92 سنة بدون فوز في المونديال</div>
+      <div class="sl">2026 — فرصة كسر الرقم ده"</div>
+    </div>
+
+    <div class="ch-sec" id="wc6">
+      <div class="ch-hdr"><div class="ch-num">06</div><div><div class="ch-main">اللي لازم يحصل بالظبط</div></div></div>
+      <div class="ch-rule"></div>
+      <div class="sl h">"عشان مصر تعدي الدور الأول — محتاجين 3 حاجات بالظبط</div>
+      <div class="sl e"></div>
+      <div class="sl h">الأولى — نكسب نيوزيلاندا في فانكوفر</div>
+      <div class="sl">ده الماتش اللي ما فيش عذر فيه — لو خسرنا منه الحساب بقى صعب جداً</div>
+      <div class="sl e"></div>
+      <div class="sl h">التانية — نعمل نتيجة ضد بلجيكا أو إيران — حتى لو تعادل</div>
+      <div class="sl">التعادل في الماتش ده بيفتح الطريق</div>
+      <div class="sl e"></div>
+      <div class="sl h">التالتة — صلاح يكون سليم ومش متأثر بضغط الموسم</div>
+      <div class="sl">لو الثلاثة حصلوا — مصر في دور الـ 32 لأول مرة في تاريخها"</div>
+    </div>
+
+    <div class="ch-sec" id="wc7">
+      <div class="ch-hdr"><div class="ch-num">07</div><div><div class="ch-main">لو عدينا — مين بعدين؟</div></div></div>
+      <div class="ch-rule"></div>
+      <div class="sl h">"لو مصر اتأهلت كتانية المجموعة — هتواجه وصيف المجموعة الرابعة</div>
+      <div class="sl">اللي فيها أمريكا وباراجواي وأستراليا</div>
+      <div class="sl h">يعني ممكن تلعب ضد أمريكا في عقر دارها — في بلد المونديال نفسه</div>
+      <div class="sl e"></div>
+      <div class="sl">لو اتأهلت كأولى — الطريق بيبقى أكتر مرونة</div>
+      <div class="sl h">يعني إزاي بتتأهل — بيفرق مش بس إنك تتأهل"</div>
+    </div>
+
+    <div class="outro" id="wc8">
+      <div class="i-note" style="text-align:center;border:none;color:#2a2a2a;margin-bottom:26px;">الخاتمة</div>
+      <div class="sl h" style="text-align:center">"مصر رايحة المونديال — بعد 8 سنين غياب</div>
+      <div class="sl" style="text-align:center">بعد إننا خسرنا التأهل في 2022 من السنغال في ركلات الترجيح</div>
+      <div class="sl" style="text-align:center">وبعد إننا خرجنا من أمم أفريقيا في نص النهائي من السنغال برضو</div>
+      <div class="sl h" style="text-align:center">السنغال عقدة — بس المونديال ملوش السنغال</div>
+      <div class="sl e"></div>
+      <div class="sl" style="text-align:center">عندنا صلاح في آخر مونديال له على الأرجح</div>
+      <div class="sl" style="text-align:center">عندنا مرموش في أفضل فترة في حياته</div>
+      <div class="sl h" style="text-align:center">الدنيا بتراهن علينا — السؤال: احنا بنراهن على نفسنا؟</div>
+      <div class="sl" style="text-align:center">قولنا في الكومنتات"</div>
+      <div class="sl e"></div>
+      <div class="outro-name" style="font-size:1.8rem;">مصر في كأس العالم 2026</div>
+    </div>
+
+  </div>
+</div>
+```
+
+  </div>
+</div>
+
+<script>
+function openWC2026() {
+  document.getElementById('wcModal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeWCModal() {
+  document.getElementById('wcModal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+function wcGoTo(id, idx) {
+  const el = document.getElementById(id);
+  const mc = document.getElementById('wcContent');
+  if (el && mc) mc.scrollTo({ top: el.offsetTop - 20, behavior: 'smooth' });
+  document.querySelectorAll('#wcModal .si').forEach((s,i) => s.classList.toggle('active', i===idx));
 }
 </script>
 
