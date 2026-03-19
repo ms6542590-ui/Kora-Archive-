@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>الأرشيف — مكتبة السكريبتات</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;900&family=Playfair+Display:ital,wght@0,700;1,400&display=swap" rel="stylesheet">
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut }
+  from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, setDoc, getDoc, onSnapshot, query, orderBy }
+  from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBhVLEofPMzRrc_Gdzxt_tPEWMynVOvqLU",
+  authDomain: "yt-script-6836e.firebaseapp.com",
+  projectId: "yt-script-6836e",
+  storageBucket: "yt-script-6836e.firebasestorage.app",
+  messagingSenderId: "297315237997",
+  appId: "1:297315237997:web:872b8ba0de1e06868dff64",
+  measurementId: "G-SFT11X8B3N"
+};
+
+const ADMIN_EMAIL = "Ms6542590@gmail.com";
+
+// ════════════════════════════════════════
+
+const app   = initializeApp(firebaseConfig);
+const auth  = getAuth(app);
+const db    = getFirestore(app);
+const provider = new GoogleAuthProvider();
+
+let currentUser = null;
+let isAdmin = false;
+let allScripts = [];
+
+// AUTH STATE
+onAuthStateChanged(auth, async (user) => {
+  currentUser = user;
+  isAdmin = user?.email === ADMIN_EMAIL;
+  updateAuthUI();
+  if (user) loadScripts();
+  else { allScripts = []; renderGrid(); }
+});
+
+// SIGN IN
+window.signIn = async () => {
+  try { await signInWithPopup(auth, provider); }
+  catch(e) { showToast('حدث خطأ في تسجيل الدخول'); }
+};
+
+// SIGN OUT
+window.signOut_ = async () => {
+  await signOut(auth);
+  currentUser = null; isAdmin = false;
+  updateAuthUI();
+  allScripts = [];
+  renderGrid();
+};
+
+// UPDATE UI AFTER AUTH
+function updateAuthUI() {
+  const loginBtn  = document.getElementById('loginBtn');
+  const userArea  = document.getElementById('userArea');
+  const userAvatar= document.getElementById('userAvatar');
+  const userName  = document.getElementById('userName');
+  const addBtn    = document.getElementById('addNavBtn');
+  const adminBadge= document.getElementById('adminBadge');
+
+  if (currentUser) {
+    loginBtn.style.display  = 'none';
+    userArea.style.display  = 'flex';
+    userAvatar.src = currentUser.photoURL || '';
+    userName.textContent = currentUser.displayName?.split(' ')[0] || 'مرحباً';
+    addBtn.style.display = isAdmin ? 'block' : 'none';
+    adminBadge.style.display = isAdmin ? 'block' : 'none';
+  } else {
+    loginBtn.style.display  = 'block';
+    userArea.style.display  = 'none';
+    addBtn.style.display    = 'none';
+    adminBadge.style.display= 'none';
+  }
+}
+
+// LOAD SCRIPTS
+async function loadScripts() {
+  try {
+    const q = query(collection(db, 'scripts'), orderBy('createdAt', 'desc'));
+    onSnapshot(q, (snap) => {
+      allScripts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderGrid();
+      document.getElementById('navCount').textContent = allScripts.length + 1;
+    });
+  } catch(e) { showToast('خطأ في تحميل السكريبتات'); }
+}
+
+// SAVE SCRIPT
+window.saveScript = async () => {
+  if (!isAdmin) return;
+
+  const title   = document.getElementById('fTitle').value.trim();
+  const cat     = document.getElementById('fCat').value;
+  const dur     = document.getElementById('fDur').value.trim() || '—';
+  const script  = document.getElementById('fScript').value.trim();
+  const isPrem  = document.getElementById('fPremium').checked;
+  const thumb   = window._thumbDataURL || null;
+
+  if (!title) { showToast('من فضلك اكتب العنوان'); return; }
+  if (!script) { showToast('من فضلك اكتب السكريبت'); return; }
+
+  document.getElementById('savingSpinner').style.display = 'inline-block';
+
+  try {
+    await addDoc(collection(db, 'scripts'), {
+      title, cat, dur, script, isPremium: isPrem,
+      thumb: thumb,
+      createdAt: Date.now()
+    });
+    closeAddModal();
+    resetForm();
+    showToast('✓ تم حفظ السكريبت');
+  } catch(e) {
+    showToast('خطأ في الحفظ — تحقق من Firebase');
+    console.error(e);
+  } finally {
+    document.getElementById('savingSpinner').style.display = 'none';
+  }
+};
+
+// DELETE SCRIPT
+window.deleteScript = async (id, e) => {
+  e.stopPropagation();
+  if (!isAdmin) return;
+  if (!confirm('هتحذف السكريبت ده؟')) return;
+  try {
+    await deleteDoc(doc(db, 'scripts', id));
+    showToast('✓ تم الحذف');
+  } catch(e) { showToast('خطأ في الحذف'); }
+};
+
+// OPEN SCRIPT
+window.openDynScript = (id) => {
+  const s = allScripts.find(x => x.id === id);
+  if (!s) return;
+
+  if (s.isPremium && !isAdmin) {
+    showLockedMsg(s.title);
+    return;
+  }
+
+  document.getElementById('dynBC').textContent  = s.title;
+  document.getElementById('dynTag').textContent = s.cat;
+
+  const lines = s.script.split('\n').map(l =>
+    l.trim() ? `<div class="sl">${l}</div>` : `<div class="sl e"></div>`
+  ).join('');
+
+  document.getElementById('dynContent').innerHTML = `
+    <div class="sc-hero" style="margin-bottom:36px;padding-bottom:32px;border-bottom:1px solid var(--border);">
+      <div class="sc-ep">سكريبت</div>
+      <div class="sc-name">${s.title}</div>
+      <div class="sc-badges">
+        <span class="bdg g">${s.dur}</span>
+        <span class="bdg">${s.cat}</span>
+        ${s.isPremium ? '<span class="bdg prem">⭐ مدفوع</span>' : ''}
+      </div>
+    </div>
+    <div>${lines}</div>`;
+
+  openModal('dynModal');
+};
+
+function showLockedMsg(title) {
+  document.getElementById('lockedTitle').textContent = title;
+  openModal('lockedModal');
+}
+
+// RENDER GRID
+function renderGrid() {
+  const grid = document.getElementById('dynCards');
+  grid.innerHTML = '';
+
+  const cat = window._currentFilter || 'all';
+
+  allScripts.forEach(s => {
+    if (cat !== 'all' && s.cat !== cat) return;
+
+    const catBadge = { 'وثائقي':'badge-doc','تحليل':'badge-analysis','تاريخ':'badge-history' };
+    const catGrad  = {
+      'وثائقي':'linear-gradient(135deg,#090909,#150808)',
+      'تحليل' :'linear-gradient(135deg,#08090d,#0a0f18)',
+      'تاريخ' :'linear-gradient(135deg,#090a08,#0c100a)'
+    };
+
+    const thumbHTML = s.thumb
+      ? `<img class="thumb-photo" src="${s.thumb}" alt="">
+         <div class="thumb-photo-overlay"></div>
+         <div class="thumb-bg" style="background:transparent;">
+           <div class="thumb-cat">${s.cat}</div>
+           <div class="thumb-title-text" style="font-size:1.5rem;">${s.title}</div>
+           ${s.isPremium ? '<div class="thumb-lock">🔒 محتوى مدفوع</div>' : ''}
+         </div>`
+      : `<div class="thumb-bg" style="background:${catGrad[s.cat]||catGrad['تحليل']};">
+           <div class="thumb-grid"></div>
+           <div class="thumb-cat">${s.cat}</div>
+           <div class="thumb-title-text" style="font-size:1.5rem;">${s.title}</div>
+           ${s.isPremium ? '<div class="thumb-lock">🔒 محتوى مدفوع</div>' : ''}
+         </div>`;
+
+    const deleteBtn = isAdmin
+      ? `<button class="delete-btn" onclick="deleteScript('${s.id}', event)" title="حذف">🗑</button>`
+      : '';
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.setAttribute('data-cat', s.cat);
+    card.innerHTML = `
+      <div class="card-thumb">
+        ${thumbHTML}
+        <div class="thumb-badge ${catBadge[s.cat]||'badge-analysis'}">${s.cat}</div>
+        <div class="thumb-dur">${s.dur}</div>
+        ${s.isPremium && !isAdmin ? '<div class="thumb-premium-overlay"></div>' : ''}
+        <div class="card-ov"><div class="open-btn">${s.isPremium && !isAdmin ? '🔒' : '↗'}</div></div>
+        ${deleteBtn}
+      </div>
+      <div class="card-body">
+        <div class="card-cat-label">${s.cat}${s.isPremium ? ' · <span style="color:#b8953f">⭐ مدفوع</span>' : ''}</div>
+        <div class="card-main-title">${s.title}</div>
+        <div class="card-foot">
+          <div class="card-meta"><span>${s.dur}</span></div>
+          <div class="card-arr">${s.isPremium && !isAdmin ? '🔒' : '↗'}</div>
+        </div>
+      </div>`;
+
+    card.onclick = () => openDynScript(s.id);
+    grid.appendChild(card);
+  });
+}
+
+// FILTER
+window.filter = (cat, btn) => {
+  window._currentFilter = cat;
+  document.querySelectorAll('.fb').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  // built-in card filter
+  const builtIn = document.getElementById('builtInCard');
+  if (builtIn) builtIn.classList.toggle('hidden', cat !== 'all' && cat !== 'وثائقي');
+
+  renderGrid();
+};
+
+window._currentFilter = 'all';
+
+// THUMBNAIL
+window.handleThumb = (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    window._thumbDataURL = ev.target.result;
+    document.getElementById('thumbPreview').src = window._thumbDataURL;
+    document.getElementById('thumbPreview').style.display = 'block';
+    document.getElementById('thumbRemoveBtn').style.display = 'block';
+    document.querySelector('.thumb-up-placeholder').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+};
+
+window.removeThumbnail = (e) => {
+  e.stopPropagation();
+  window._thumbDataURL = null;
+  document.getElementById('thumbPreview').src = '';
+  document.getElementById('thumbPreview').style.display = 'none';
+  document.getElementById('thumbRemoveBtn').style.display = 'none';
+  document.querySelector('.thumb-up-placeholder').style.display = 'flex';
+  document.getElementById('fileInput').value = '';
+};
+
+// HELPERS
+window.openModal = (id) => {
+  document.getElementById(id).classList.add('open');
+  document.body.style.overflow = 'hidden';
+};
+window.closeModal = (id) => {
+  document.getElementById(id).classList.remove('open');
+  document.body.style.overflow = '';
+};
+window.openAddModal = () => { if(isAdmin) document.getElementById('addModal').classList.add('open'); };
+window.closeAddModal = () => document.getElementById('addModal').classList.remove('open');
+window.openBuiltIn = () => { openModal('builtInModal'); initBuiltInScroll(); };
+
+function resetForm() {
+  document.getElementById('fTitle').value = '';
+  document.getElementById('fDur').value = '';
+  document.getElementById('fScript').value = '';
+  document.getElementById('fCat').selectedIndex = 0;
+  document.getElementById('fPremium').checked = false;
+  window.removeThumbnail({ stopPropagation: ()=>{} });
+}
+
+window.showToast = (msg) => {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+};
+
+// BUILT-IN SIDEBAR
+window.goTo = (id, idx) => {
+  const el = document.getElementById(id);
+  const mc = document.getElementById('builtInContent');
+  if (el && mc) mc.scrollTo({ top: el.offsetTop - 20, behavior: 'smooth' });
+  document.querySelectorAll('.si').forEach((s,i) => s.classList.toggle('active', i===idx));
+};
+
+let scrollInited = false;
+window.initBuiltInScroll = () => {
+  if (scrollInited) return; scrollInited = true;
+  const mc  = document.getElementById('builtInContent');
+  const ids = ['s0','s1','s2','s3','s4','s5','s6','s7','s8','s9','s10','s11','s12','s13','s14','s15'];
+  mc.addEventListener('scroll', () => {
+    let cur = 0;
+    ids.forEach((id, i) => {
+      const el = document.getElementById(id);
+      if (el && el.offsetTop - 120 <= mc.scrollTop) cur = i;
+    });
+    document.querySelectorAll('.si').forEach((s,i) => s.classList.toggle('active', i===cur));
+  }, { passive: true });
+};
+
+document.addEventListener('keydown', e => {
+  if (e.key==='Escape') {
+    closeModal('builtInModal');
+    closeModal('dynModal');
+    closeModal('lockedModal');
+    closeAddModal();
+  }
+});
+</script>
+
+<style>
+:root{
+  --bg:#080808;--surface:#0f0f0f;--card-bg:#111;
+  --border:#1e1e1e;--border-light:#2a2a2a;
+  --gold:#b8953f;--gold-light:#d4af6a;--gold-dim:#b8953f22;
+  --red-light:#c0392b;--text:#e5ddd0;--text-dim:#8a8278;
+  --text-muted:#4a4540;--white:#f0ebe3;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg);color:var(--text);font-family:'Cairo',sans-serif;min-height:100vh;overflow-x:hidden;}
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-thumb{background:#2a2a2a;border-radius:2px;}
+::-webkit-scrollbar-thumb:hover{background:var(--gold);}
+
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;height:64px;background:rgba(8,8,8,0.96);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 50px;z-index:50;}
+.nav-logo{display:flex;align-items:center;gap:14px;}
+.nav-logo-icon{width:34px;height:34px;border:1px solid var(--gold);display:flex;align-items:center;justify-content:center;font-size:1rem;color:var(--gold);}
+.nav-logo-text{font-size:0.9rem;font-weight:900;letter-spacing:2px;color:var(--white);}
+.nav-logo-sub{font-size:0.55rem;color:var(--text-muted);letter-spacing:4px;margin-top:1px;}
+.nav-right{display:flex;align-items:center;gap:16px;}
+.nav-stat{text-align:center;font-size:0.58rem;color:var(--text-muted);letter-spacing:2px;}
+.nav-stat strong{display:block;font-family:'Playfair Display',serif;font-size:1.3rem;color:var(--gold);line-height:1;}
+.nav-div{width:1px;height:28px;background:var(--border-light);}
+
+/* AUTH */
+.btn-login{padding:8px 18px;font-size:0.65rem;letter-spacing:1px;font-family:'Cairo',sans-serif;font-weight:700;background:var(--gold-dim);border:1px solid var(--gold);color:var(--gold);cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:8px;}
+.btn-login:hover{background:var(--gold);color:#000;}
+.btn-login svg{width:16px;height:16px;}
+.user-area{display:none;align-items:center;gap:12px;}
+.user-avatar{width:32px;height:32px;border-radius:50%;border:1px solid var(--border-light);}
+.user-name{font-size:0.75rem;color:var(--text-dim);font-weight:500;}
+.admin-badge{font-size:0.55rem;letter-spacing:2px;color:#000;background:var(--gold);padding:2px 8px;font-weight:700;}
+.btn-logout{padding:6px 12px;font-size:0.6rem;background:none;border:1px solid var(--border-light);color:var(--text-muted);cursor:pointer;transition:all 0.2s;font-family:'Cairo',sans-serif;}
+.btn-logout:hover{border-color:var(--red-light);color:var(--red-light);}
+.btn-nav{padding:8px 18px;font-size:0.65rem;letter-spacing:2px;font-family:'Cairo',sans-serif;font-weight:700;background:var(--gold-dim);border:1px solid var(--gold);color:var(--gold);cursor:pointer;transition:all 0.2s;display:none;}
+.btn-nav:hover{background:var(--gold);color:#000;}
+
+/* HERO */
+.hero{padding:120px 50px 55px;position:relative;overflow:hidden;}
+.hero::before{content:'ARCHIVE';position:absolute;top:70px;left:-10px;font-family:'Playfair Display',serif;font-size:18vw;color:transparent;-webkit-text-stroke:1px #161616;pointer-events:none;line-height:1;white-space:nowrap;font-style:italic;}
+.hero-label{font-size:0.6rem;letter-spacing:6px;color:var(--gold);margin-bottom:14px;display:flex;align-items:center;gap:12px;}
+.hero-label::before{content:'';display:block;width:28px;height:1px;background:var(--gold);}
+.hero-title{font-family:'Playfair Display',serif;font-size:clamp(2.5rem,5vw,4rem);color:var(--white);line-height:1.1;font-weight:700;max-width:560px;margin-bottom:14px;}
+.hero-title em{color:var(--gold);font-style:italic;}
+.hero-desc{font-size:0.82rem;color:var(--text-dim);max-width:380px;line-height:1.9;font-weight:300;}
+
+/* LOGIN WALL */
+.login-wall{text-align:center;padding:60px 20px;display:none;}
+.login-wall.show{display:block;}
+.lw-icon{font-size:3rem;margin-bottom:16px;}
+.lw-title{font-family:'Playfair Display',serif;font-size:1.8rem;color:var(--white);margin-bottom:10px;}
+.lw-desc{font-size:0.82rem;color:var(--text-dim);margin-bottom:28px;line-height:1.8;}
+.lw-btn{padding:12px 32px;font-size:0.8rem;font-family:'Cairo',sans-serif;font-weight:700;background:var(--gold);border:none;color:#000;cursor:pointer;letter-spacing:2px;transition:all 0.2s;display:inline-flex;align-items:center;gap:10px;}
+.lw-btn:hover{background:var(--gold-light);}
+
+/* FILTER */
+.filter-bar{padding:0 50px 26px;display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--border);margin-bottom:40px;}
+.fb{padding:7px 18px;font-size:0.65rem;letter-spacing:2px;font-family:'Cairo',sans-serif;font-weight:600;background:none;border:1px solid transparent;color:var(--text-muted);cursor:pointer;transition:all 0.2s;}
+.fb:hover{color:var(--text);border-color:var(--border-light);}
+.fb.active{color:var(--gold);border-color:var(--gold);background:var(--gold-dim);}
+
+/* GRID */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1px;background:var(--border);margin:0 50px 80px;}
+.hidden{display:none!important;}
+
+/* CARD */
+.card{background:var(--card-bg);cursor:pointer;position:relative;overflow:hidden;transition:background 0.3s;animation:cardIn 0.5s ease both;}
+.card:not(.card-add):hover{background:#151515;}
+@keyframes cardIn{from{opacity:0;transform:translateY(18px);}to{opacity:1;transform:translateY(0);}}
+.card-thumb{width:100%;aspect-ratio:16/9;position:relative;overflow:hidden;background:#0a0a0a;}
+.thumb-bg{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;}
+.thumb-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+.thumb-photo-overlay{position:absolute;inset:0;background:linear-gradient(135deg,rgba(0,0,0,0.65),rgba(0,0,0,0.4));}
+.thumb-grid{position:absolute;inset:0;background-image:repeating-linear-gradient(0deg,transparent,transparent 39px,#1c1c1c 40px),repeating-linear-gradient(90deg,transparent,transparent 39px,#1c1c1c 40px);opacity:0.3;}
+.thumb-cat{font-size:0.55rem;letter-spacing:4px;color:var(--gold);margin-bottom:10px;opacity:0.9;position:relative;z-index:1;}
+.thumb-title-text{font-size:2rem;font-weight:900;color:var(--white);line-height:1.1;position:relative;z-index:1;text-shadow:0 2px 16px rgba(0,0,0,0.8);}
+.thumb-lock{font-size:0.65rem;color:rgba(255,255,255,0.5);position:relative;z-index:1;margin-top:8px;letter-spacing:2px;}
+.thumb-badge{position:absolute;top:12px;right:12px;font-size:0.55rem;letter-spacing:2px;padding:3px 9px;font-weight:700;z-index:3;}
+.badge-doc{color:var(--red-light);background:rgba(155,35,53,0.18);border:1px solid rgba(155,35,53,0.4);}
+.badge-analysis{color:#5b8fa8;background:rgba(91,143,168,0.18);border:1px solid rgba(91,143,168,0.4);}
+.badge-history{color:#7a9a5a;background:rgba(122,154,90,0.18);border:1px solid rgba(122,154,90,0.4);}
+.thumb-dur{position:absolute;bottom:12px;right:12px;font-size:0.58rem;color:rgba(255,255,255,0.45);background:rgba(0,0,0,0.55);padding:2px 8px;z-index:3;}
+.thumb-premium-overlay{position:absolute;inset:0;background:rgba(0,0,0,0.3);backdrop-filter:blur(2px);z-index:2;}
+.card-ov{position:absolute;inset:0;background:rgba(184,149,63,0.05);opacity:0;transition:opacity 0.3s;display:flex;align-items:center;justify-content:center;z-index:4;}
+.card:hover .card-ov{opacity:1;}
+.open-btn{width:52px;height:52px;border:1px solid rgba(184,149,63,0.5);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--gold-light);font-size:1rem;transform:scale(0.7);transition:transform 0.35s cubic-bezier(0.34,1.56,0.64,1);}
+.card:hover .open-btn{transform:scale(1);}
+.delete-btn{position:absolute;bottom:8px;left:8px;z-index:5;background:rgba(0,0,0,0.7);border:1px solid rgba(192,57,43,0.4);color:rgba(192,57,43,0.8);font-size:0.75rem;padding:5px 9px;cursor:pointer;transition:all 0.2s;opacity:0;}
+.card:hover .delete-btn{opacity:1;}
+.delete-btn:hover{background:rgba(192,57,43,0.2);border-color:var(--red-light);color:var(--red-light);}
+.card-body{padding:18px 20px;border-top:1px solid var(--border);}
+.card-cat-label{font-size:0.58rem;letter-spacing:3px;color:var(--gold);margin-bottom:6px;font-weight:600;}
+.card-main-title{font-size:0.93rem;font-weight:700;color:var(--white);line-height:1.5;margin-bottom:12px;}
+.card-foot{display:flex;align-items:center;justify-content:space-between;}
+.card-meta{font-size:0.62rem;color:var(--text-muted);}
+.card-arr{width:28px;height:28px;border:1px solid var(--border-light);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:0.7rem;transition:all 0.2s;}
+.card:hover .card-arr{border-color:var(--gold);color:var(--gold);}
+.card-add{background:transparent;border:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;min-height:250px;cursor:pointer;transition:background 0.3s;}
+.card-add:hover{background:rgba(184,149,63,0.02);}
+.add-circle{width:48px;height:48px;border:1px solid #252525;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#333;font-size:1.3rem;transition:all 0.3s;}
+.card-add:hover .add-circle{border-color:var(--gold);color:var(--gold);}
+.add-lbl{font-size:0.62rem;color:#333;letter-spacing:3px;transition:color 0.3s;}
+.card-add:hover .add-lbl{color:var(--text-muted);}
+
+footer{border-top:1px solid var(--border);padding:26px 50px;display:flex;align-items:center;justify-content:space-between;}
+.f-logo{font-size:0.65rem;letter-spacing:3px;color:var(--text-muted);}
+.f-logo span{color:var(--gold);}
+
+/* MODALS */
+.modal{position:fixed;inset:0;z-index:200;display:none;}
+.modal.open{display:flex;}
+.modal-bg{position:absolute;inset:0;background:rgba(4,4,4,0.97);}
+.modal-panel{position:relative;width:100%;height:100%;display:flex;flex-direction:column;animation:slideUp 0.3s cubic-bezier(0.22,1,0.36,1);}
+@keyframes slideUp{from{transform:translateY(22px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+.m-bar{height:64px;background:rgba(8,8,8,0.97);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 50px;flex-shrink:0;}
+.m-bar-l{display:flex;align-items:center;gap:16px;}
+.m-back{font-size:0.62rem;color:var(--text-muted);letter-spacing:2px;cursor:pointer;background:none;border:none;transition:color 0.2s;}
+.m-back:hover{color:var(--text);}
+.m-sep{width:1px;height:18px;background:var(--border-light);}
+.m-bc{font-size:0.62rem;color:var(--text-dim);}
+.m-bc span{color:var(--gold);}
+.m-bar-r{display:flex;align-items:center;gap:10px;}
+.m-tag{font-size:0.55rem;letter-spacing:2px;color:var(--red-light);border:1px solid rgba(192,57,43,0.3);padding:4px 11px;}
+.btn-x{width:34px;height:34px;border:1px solid var(--border-light);border-radius:50%;background:none;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s;}
+.btn-x:hover{border-color:var(--text);color:var(--text);}
+.m-layout{flex:1;display:flex;overflow:hidden;}
+.m-sidebar{width:240px;flex-shrink:0;border-left:1px solid var(--border);overflow-y:auto;padding:24px 0;background:var(--surface);}
+.sb-lbl{font-size:0.55rem;letter-spacing:4px;color:var(--text-muted);padding:0 20px 12px;}
+.si{display:flex;align-items:center;gap:12px;padding:10px 20px;cursor:pointer;transition:background 0.2s;border-right:2px solid transparent;}
+.si:hover{background:rgba(255,255,255,0.02);}
+.si.active{background:rgba(184,149,63,0.05);border-right-color:var(--gold);}
+.si-n{font-family:'Playfair Display',serif;font-size:0.7rem;color:var(--text-muted);min-width:20px;font-style:italic;}
+.si.active .si-n{color:var(--gold);}
+.si-t{font-size:0.68rem;color:var(--text-dim);font-weight:500;}
+.si.active .si-t{color:var(--text);}
+.m-content{flex:1;overflow-y:auto;padding:55px 65px;}
+.sc-hero{padding-bottom:40px;margin-bottom:40px;border-bottom:1px solid var(--border);position:relative;}
+.sc-hero::after{content:'';position:absolute;bottom:-1px;right:0;width:60px;height:2px;background:var(--gold);}
+.sc-ep{font-size:0.58rem;letter-spacing:5px;color:var(--gold);margin-bottom:12px;display:flex;align-items:center;gap:10px;}
+.sc-ep::before{content:'';width:16px;height:1px;background:var(--gold);}
+.sc-name{font-family:'Playfair Display',serif;font-size:clamp(1.8rem,4vw,3.2rem);color:var(--white);line-height:1.05;font-weight:700;margin-bottom:5px;}
+.sc-badges{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap;}
+.bdg{font-size:0.58rem;letter-spacing:2px;padding:4px 12px;border:1px solid var(--border-light);color:var(--text-dim);font-weight:600;}
+.bdg.g{border-color:rgba(184,149,63,0.4);color:var(--gold);}
+.bdg.prem{border-color:rgba(184,149,63,0.6);color:var(--gold);background:var(--gold-dim);}
+.prod-note{background:#0d0d0d;border:1px solid var(--border);border-right:3px solid var(--gold);padding:13px 18px;margin-bottom:44px;font-size:0.75rem;color:var(--text-muted);font-style:italic;line-height:1.7;display:flex;gap:12px;}
+.ch-sec{margin-bottom:55px;scroll-margin-top:80px;}
+.ch-hdr{display:flex;align-items:flex-start;gap:16px;margin-bottom:20px;}
+.ch-num{font-family:'Playfair Display',serif;font-size:4rem;line-height:0.85;color:#1a1a1a;font-weight:700;flex-shrink:0;font-style:italic;margin-top:4px;}
+.ch-main{font-size:1.1rem;font-weight:700;color:var(--white);margin-bottom:3px;}
+.ch-sub{font-size:0.73rem;color:var(--gold);font-style:italic;font-family:'Playfair Display',serif;}
+.ch-rule{width:100%;height:1px;background:linear-gradient(to left,transparent,var(--border-light) 50%,transparent);margin-bottom:20px;}
+.i-note{font-size:0.67rem;color:#383838;font-style:italic;border-right:2px solid #1e1e1e;padding:5px 11px;margin-bottom:14px;line-height:1.6;}
+.sl{font-size:0.89rem;line-height:2;color:#999;padding-right:8px;font-weight:300;}
+.sl.h{color:var(--gold-light);font-weight:600;font-size:0.92rem;}
+.sl.d{color:#c0392b;font-weight:700;font-size:1.1rem;letter-spacing:2px;padding:4px 0;}
+.sl.e{height:11px;display:block;}
+.tl-box{background:#0c0c0c;border:1px solid var(--border);margin:16px 0;overflow:hidden;}
+.tl-row{display:flex;border-bottom:1px solid var(--border);transition:background 0.2s;}
+.tl-row:last-child{border:none;}
+.tl-row:hover{background:rgba(184,149,63,0.03);}
+.tl-d{padding:12px 16px;font-family:'Playfair Display',serif;font-size:0.73rem;color:var(--gold);min-width:135px;border-left:1px solid var(--border);font-style:italic;display:flex;align-items:center;}
+.tl-e{padding:12px 16px;font-size:0.78rem;color:#777;display:flex;align-items:center;}
+.outro{background:linear-gradient(135deg,#0a0808,#0d0a08);border:1px solid #2a1515;padding:50px 40px;text-align:center;margin-top:30px;position:relative;overflow:hidden;}
+.outro::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(155,35,53,0.1),transparent 60%);}
+.outro-name{font-family:'Playfair Display',serif;font-size:3rem;color:var(--white);font-weight:700;position:relative;margin-bottom:6px;}
+.outro-years{font-size:0.68rem;letter-spacing:8px;color:var(--text-muted);font-family:'Playfair Display',serif;font-style:italic;position:relative;}
+
+/* ADD MODAL */
+.add-modal{position:fixed;inset:0;z-index:300;display:none;align-items:center;justify-content:center;}
+.add-modal.open{display:flex;}
+.add-modal-bg{position:absolute;inset:0;background:rgba(0,0,0,0.93);}
+.add-box{position:relative;background:#111;border:1px solid var(--border-light);width:100%;max-width:650px;max-height:92vh;overflow-y:auto;animation:slideUp 0.3s ease;}
+.add-box-hdr{padding:22px 26px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.add-box-title{font-size:1rem;font-weight:700;color:var(--white);}
+.add-box-sub{font-size:0.63rem;color:var(--text-muted);letter-spacing:2px;margin-top:3px;}
+.add-box-body{padding:26px;display:flex;flex-direction:column;gap:18px;}
+.flbl{font-size:0.62rem;letter-spacing:3px;color:var(--gold);margin-bottom:7px;display:block;font-weight:600;}
+.finput,.fselect,.ftextarea{width:100%;background:#0d0d0d;border:1px solid var(--border-light);color:var(--text);font-family:'Cairo',sans-serif;font-size:0.84rem;padding:11px 13px;outline:none;transition:border-color 0.2s;resize:none;}
+.finput:focus,.fselect:focus,.ftextarea:focus{border-color:var(--gold);}
+.fselect option{background:#111;}
+.ftextarea{min-height:190px;line-height:1.85;}
+.frow2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.premium-toggle{display:flex;align-items:center;gap:10px;padding:12px 14px;background:#0d0d0d;border:1px solid var(--border-light);cursor:pointer;}
+.premium-toggle input{accent-color:var(--gold);width:16px;height:16px;cursor:pointer;}
+.premium-toggle label{font-size:0.78rem;color:var(--text-dim);cursor:pointer;}
+.premium-toggle label span{color:var(--gold);}
+.thumb-up{border:1px dashed var(--border-light);background:#0a0a0a;cursor:pointer;transition:border-color 0.25s;position:relative;aspect-ratio:16/9;overflow:hidden;display:flex;align-items:center;justify-content:center;}
+.thumb-up:hover{border-color:var(--gold);}
+.thumb-up-placeholder{display:flex;flex-direction:column;align-items:center;gap:10px;pointer-events:none;}
+.thumb-up-icon{font-size:2rem;color:#2a2a2a;}
+.thumb-up-txt{font-size:0.65rem;color:#3a3a3a;letter-spacing:2px;}
+.thumb-up-hint{font-size:0.58rem;color:#2a2a2a;}
+#thumbPreview{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none;}
+#thumbRemoveBtn{position:absolute;top:8px;left:8px;background:rgba(0,0,0,0.75);border:1px solid #444;color:#aaa;font-size:0.6rem;padding:4px 9px;cursor:pointer;display:none;z-index:2;transition:all 0.2s;font-family:'Cairo',sans-serif;}
+#thumbRemoveBtn:hover{border-color:var(--red-light);color:var(--red-light);}
+#fileInput{display:none;}
+.add-box-footer{padding:16px 26px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;align-items:center;}
+.btn-cancel{padding:9px 20px;background:none;border:1px solid var(--border-light);color:var(--text-muted);font-family:'Cairo',sans-serif;font-size:0.73rem;cursor:pointer;transition:all 0.2s;}
+.btn-cancel:hover{border-color:var(--text);color:var(--text);}
+.btn-save{padding:9px 26px;background:var(--gold);border:none;color:#000;font-family:'Cairo',sans-serif;font-size:0.73rem;font-weight:700;cursor:pointer;transition:all 0.2s;letter-spacing:1px;}
+.btn-save:hover{background:var(--gold-light);}
+.spinner{display:none;width:16px;height:16px;border:2px solid #00000033;border-top-color:#000;border-radius:50%;animation:spin 0.6s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* LOCKED MODAL */
+.locked-modal{position:fixed;inset:0;z-index:400;display:none;align-items:center;justify-content:center;}
+.locked-modal.open{display:flex;}
+.locked-bg{position:absolute;inset:0;background:rgba(0,0,0,0.92);}
+.locked-box{position:relative;background:#111;border:1px solid var(--border-light);max-width:440px;width:100%;padding:50px 40px;text-align:center;animation:slideUp 0.3s ease;}
+.locked-icon{font-size:3rem;margin-bottom:16px;}
+.locked-title-label{font-size:0.6rem;letter-spacing:4px;color:var(--gold);margin-bottom:10px;}
+.locked-script-title{font-family:'Playfair Display',serif;font-size:1.5rem;color:var(--white);margin-bottom:16px;line-height:1.3;}
+.locked-desc{font-size:0.8rem;color:var(--text-dim);line-height:1.8;margin-bottom:28px;}
+.locked-close{padding:10px 28px;background:none;border:1px solid var(--border-light);color:var(--text-muted);font-family:'Cairo',sans-serif;font-size:0.73rem;cursor:pointer;transition:all 0.2s;}
+.locked-close:hover{border-color:var(--text);color:var(--text);}
+
+/* TOAST */
+.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(16px);background:#1a1a1a;border:1px solid var(--gold);color:var(--gold);padding:11px 26px;font-size:0.72rem;letter-spacing:2px;opacity:0;transition:all 0.3s;z-index:999;pointer-events:none;font-family:'Cairo',sans-serif;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+@media(max-width:860px){
+  nav,.hero,.filter-bar,.grid,footer{padding-left:20px;padding-right:20px;}
+  .grid{margin-left:0;margin-right:0;}
+  .m-sidebar{display:none;}
+  .m-content{padding:26px 20px;}
+  .m-bar{padding:0 20px;}
+  .frow2{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">
+    <div class="nav-logo-icon">⚽</div>
+    <div>
+      <div class="nav-logo-text">الأرشيف</div>
+      <div class="nav-logo-sub">Scripts Hub</div>
+    </div>
+  </div>
+  <div class="nav-right">
+    <div class="nav-stat"><strong id="navCount">1</strong>سكريبت</div>
+    <div class="nav-div"></div>
+
+    <!-- LOGIN BTN -->
+    <button class="btn-login" id="loginBtn" onclick="signIn()">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+      دخول بـ Google
+    </button>
+
+    <!-- USER AREA -->
+    <div class="user-area" id="userArea">
+      <span class="admin-badge" id="adminBadge" style="display:none;">ADMIN</span>
+      <img class="user-avatar" id="userAvatar" src="" alt="">
+      <span class="user-name" id="userName"></span>
+      <button class="btn-logout" onclick="signOut_()">خروج</button>
+    </div>
+
+    <button class="btn-nav" id="addNavBtn" onclick="openAddModal()">+ سكريبت جديد</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-label">مكتبة السكريبتات</div>
+  <h1 class="hero-title">أرشيف <em>قصص</em><br>الكورة</h1>
+  <p class="hero-desc">كل سكريبت وثيقة — كل فيديو قضية. منصة لحفظ الأفكار ومراجعتها قبل التصوير.</p>
+</div>
+
+<!-- FILTER -->
+<div class="filter-bar">
+  <button class="fb active" onclick="filter('all',this)">الكل</button>
+  <button class="fb" onclick="filter('وثائقي',this)">وثائقي</button>
+  <button class="fb" onclick="filter('تحليل',this)">تحليل</button>
+  <button class="fb" onclick="filter('تاريخ',this)">تاريخ</button>
+</div>
+
+<!-- GRID -->
+<div class="grid" id="grid">
+
+  <!-- BUILT-IN CARD -->
+  <div class="card" id="builtInCard" data-cat="وثائقي" onclick="openBuiltIn()">
+    <div class="card-thumb">
+      <div class="thumb-bg" style="background:linear-gradient(135deg,#090909,#150808,#1a0a0a);">
+        <div class="thumb-grid"></div>
+        <div class="thumb-cat">وثائقي — كورة محلية</div>
+        <div class="thumb-title-text">أحمد رفعت</div>
+        <div class="thumb-sub" style="font-family:'Playfair Display';font-size:0.68rem;color:var(--text-dim);letter-spacing:4px;font-style:italic;position:relative;z-index:1;margin-top:7px;">1993 — 2024</div>
+      </div>
+      <div class="thumb-badge badge-doc">وثائقي</div>
+      <div class="thumb-dur">+15 دقيقة</div>
+      <div class="card-ov"><div class="open-btn">↗</div></div>
+    </div>
+    <div class="card-body">
+      <div class="card-cat-label">كورة محلية · وثائقي</div>
+      <div class="card-main-title">اللاعب اللي ما خلوهوش يكمل — قصة أحمد رفعت</div>
+      <div class="card-foot">
+        <div class="card-meta"><span>14 chapter</span> · <span>+15 دقيقة</span></div>
+        <div class="card-arr">↗</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DYNAMIC CARDS INJECT HERE -->
+  <div id="dynCards" style="display:contents;"></div>
+
+  <!-- ADD CARD (admin only, shown via JS) -->
+  <div class="card card-add" id="addCardBtn" onclick="openAddModal()" style="display:none;">
+    <div class="add-circle">+</div>
+    <div class="add-lbl">سكريبت جديد</div>
+  </div>
+
+</div>
+
+<!-- LOGIN WALL (shown when not logged in) -->
+<div class="login-wall" id="loginWall">
+  <div class="lw-icon">🔐</div>
+  <div class="lw-title">سجل دخولك لتصفح الأرشيف</div>
+  <div class="lw-desc">الوصول للسكريبتات متاح للأعضاء المسجلين فقط<br>سجل دخولك بحسابك على Google</div>
+  <button class="lw-btn" onclick="signIn()">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+    دخول بـ Google
+  </button>
+</div>
+
+<footer>
+  <div class="f-logo">الأرشيف <span>·</span> Scripts Hub</div>
+  <div style="font-size:0.58rem;color:#222;">للاستخدام الشخصي</div>
+</footer>
+
+<!-- ══ BUILT-IN MODAL (Ahmed Refaat) ══ -->
+<div class="modal" id="builtInModal">
+  <div class="modal-bg"></div>
+  <div class="modal-panel">
+    <div class="m-bar">
+      <div class="m-bar-l">
+        <button class="m-back" onclick="closeModal('builtInModal')">← رجوع</button>
+        <div class="m-sep"></div>
+        <div class="m-bc">الأرشيف <span>/</span> أحمد رفعت</div>
+      </div>
+      <div class="m-bar-r">
+        <div class="m-tag">وثائقي</div>
+        <button class="btn-x" onclick="closeModal('builtInModal')">✕</button>
+      </div>
+    </div>
+    <div class="m-layout">
+      <div class="m-sidebar">
+        <div class="sb-lbl">محتوى السكريبت</div>
+        <div class="si active" onclick="goTo('s0',0)"><span class="si-n">00</span><span class="si-t">INTRO</span></div>
+        <div class="si" onclick="goTo('s1',1)"><span class="si-n">01</span><span class="si-t">البداية</span></div>
+        <div class="si" onclick="goTo('s2',2)"><span class="si-n">02</span><span class="si-t">مودرن فيوتشر</span></div>
+        <div class="si" onclick="goTo('s3',3)"><span class="si-n">03</span><span class="si-t">فرصة العمر</span></div>
+        <div class="si" onclick="goTo('s4',4)"><span class="si-n">04</span><span class="si-t">الصدمة</span></div>
+        <div class="si" onclick="goTo('s5',5)"><span class="si-n">05</span><span class="si-t">العودة والعقوبة</span></div>
+        <div class="si" onclick="goTo('s6',6)"><span class="si-n">06</span><span class="si-t">الجسم بيتكلم</span></div>
+        <div class="si" onclick="goTo('s7',7)"><span class="si-n">07</span><span class="si-t">11 مارس 2024</span></div>
+        <div class="si" onclick="goTo('s8',8)"><span class="si-n">08</span><span class="si-t">الشهور الأخيرة</span></div>
+        <div class="si" onclick="goTo('s9',9)"><span class="si-n">09</span><span class="si-t">قال الحقيقة</span></div>
+        <div class="si" onclick="goTo('s10',10)"><span class="si-n">10</span><span class="si-t">6 يوليو 2024</span></div>
+        <div class="si" onclick="goTo('s11',11)"><span class="si-n">11</span><span class="si-t">التحقيق</span></div>
+        <div class="si" onclick="goTo('s12',12)"><span class="si-n">12</span><span class="si-t">السؤال الكبير</span></div>
+        <div class="si" onclick="goTo('s13',13)"><span class="si-n">13</span><span class="si-t">كلام لأشخاص</span></div>
+        <div class="si" onclick="goTo('s14',14)"><span class="si-n">14</span><span class="si-t">النظام المكسور</span></div>
+        <div class="si" onclick="goTo('s15',15)"><span class="si-n">—</span><span class="si-t">الخاتمة</span></div>
+      </div>
+      <div class="m-content" id="builtInContent">
+        <div class="sc-hero" id="s0">
+          <div class="sc-ep">سكريبت #001</div>
+          <div class="sc-name">أحمد رفعت</div>
+          <div style="font-size:0.7rem;color:var(--text-muted);letter-spacing:6px;font-family:'Playfair Display',serif;font-style:italic;margin-top:4px;">1993 — 2024</div>
+          <div class="sc-badges"><span class="bdg g">+15 دقيقة</span><span class="bdg">14 Chapter</span><span class="bdg">وثائقي</span></div>
+        </div>
+        <div class="prod-note"><span style="color:var(--gold)">♪</span><span>موسيقى بيانو هادي طول الفيديو — فلتر بارد رمادي — خط أبيض على أسود</span></div>
+        <div class="ch-sec"><div class="ch-hdr"><div class="ch-num">00</div><div><div class="ch-main">INTRO</div></div></div><div class="ch-rule"></div><div class="i-note">شاشة سوداء — صمت 3 ثواني — بعدين صوت كليب حقيقي من آخر حوار</div><div class="sl">"النهارده مش هنتكلم عن ماتش — مش هنتكلم عن هدف</div><div class="sl">هنتكلم عن واحد كان شايل حلم كبير وكان المفروض يكمل</div><div class="sl">بس الكورة المصرية — بأشخاصها — بمنظومتها الفاسدة — ما خليتهوش يكمل</div><div class="sl">ده رأيي — وهقولك الحقايق — وأنت احكم يا سيدي"</div><div class="i-note">اسمه يظهر: أحمد رفعت | 1993 — 2024</div></div>
+        <div class="ch-sec" id="s1"><div class="ch-hdr"><div class="ch-num">01</div><div><div class="ch-main">البداية</div><div class="ch-sub">"طفل من إنبي"</div></div></div><div class="ch-rule"></div><div class="sl">"أحمد رفعت مش ابن أهلي — مش ابن زمالك — بدأ من إنبي</div><div class="sl">لأن محدش بيفتح لك الباب — أنت اللي بتخبط بإيدك</div><div class="sl e"></div><div class="sl">الناس اللي عرفته بيقولوا إنه كان كتوم — بيضحك بصعوبة</div><div class="sl">بس لما بيضحك — الدنيا بتتغير</div><div class="sl e"></div><div class="sl">اشتغل — تدرب — وصل للزمالك — الاتحاد السكندري — المصري</div><div class="sl">مشوار واقعي لواحد بيشتغل من غير واسطة ولا رشاوي</div><div class="sl e"></div><div class="sl">2013 — كأس العالم تحت 20 في تركيا</div><div class="sl h">ده معناه إنك من أحسن 23 لاعب في مصر في سنك</div><div class="sl e"></div><div class="sl">وهو صدّق — وكمّل"</div></div>
+        <div class="ch-sec" id="s2"><div class="ch-hdr"><div class="ch-num">02</div><div><div class="ch-main">مودرن فيوتشر</div><div class="ch-sub">"النادي اللي غيّر كل حاجة"</div></div></div><div class="ch-rule"></div><div class="sl">"2021 — أحمد رفعت بيوقع مع مودرن فيوتشر</div><div class="sl h">اللي محدش كان يعرفه — إن العقد ده هيبقى بداية النهاية</div><div class="sl e"></div><div class="sl">مش لأن رفعت عمل غلطة</div><div class="sl">لأن الناس اللي المفروض يحموه — فضلوا يفكروا في نفسهم بس"</div></div>
+        <div class="ch-sec" id="s3"><div class="ch-hdr"><div class="ch-num">03</div><div><div class="ch-main">فرصة العمر</div><div class="ch-sub">"الوحدة الإماراتي — والوعود الكدابة"</div></div></div><div class="ch-rule"></div><div class="sl">"موسم 2022-2023 — جه عرض من نادي الوحدة الإماراتي</div><div class="sl">بس أحمد رفعت رفض في الأول</div><div class="sl h">لأنه كان خايف — وكان حاسس إن في حاجة غلط — وكل خوفه كان صح</div><div class="sl e"></div><div class="sl">مسؤولو النادي — على رأسهم أحمد دياب — طمّنوه</div><div class="sl">قالوله: كل حاجة تمام — الأوراق تمام — روح</div><div class="sl e"></div><div class="sl">راح الإمارات — لعب — وفي الأول كان تمام ومتألق</div><div class="sl">ده كان المفروض يكون بداية فصل تاني في حياته"</div></div>
+        <div class="ch-sec" id="s4"><div class="ch-hdr"><div class="ch-num">04</div><div><div class="ch-main">الصدمة</div><div class="ch-sub">"الورقة اللي دمّرت كل حاجة"</div></div></div><div class="ch-rule"></div><div class="i-note">الموسيقى تنزل جداً — شبه صمت</div><div class="sl">"بعد شهرين — جاله خبر إداري — بارد — رسمي</div><div class="sl h">خروجك من مصر كان غير قانوني — تصريح السفر مش صح</div><div class="sl e"></div><div class="sl">الوحدة فسخت التعاقد — وأحمد رفعت بقى شاب وحيد في إمارة غريبة بيصرف من جيبه</div><div class="sl h">شهر كامل — من جيبه الخاص — محدش كان بيسأل عنه</div><div class="sl e"></div><div class="sl">النادي سابه — الاتحاد مكانش موجود — الرابطة مكانتش موجودة</div><div class="sl h">الوحيد اللي اتصل بيه من الكورة الرسمية — كان حازم إمام — من إنسانيته هو"</div></div>
+        <div class="ch-sec" id="s5"><div class="ch-hdr"><div class="ch-num">05</div><div><div class="ch-main">العودة والعقوبة</div><div class="ch-sub">"رجع — وعاقبوه"</div></div></div><div class="ch-rule"></div><div class="sl">"رجع مصر — وأول حاجة استقبلته: إيقاف 6 أشهر</div><div class="sl h">عقوبة — على إيه؟ على إنه صدّق الناس اللي المفروض يوثق فيهم</div><div class="sl e"></div><div class="sl">الكورة هي هويته — روتينه — صحته النفسية — كل حاجة</div><div class="sl h">ده مش بس ظلم — ده تدمير"</div></div>
+        <div class="ch-sec" id="s6"><div class="ch-hdr"><div class="ch-num">06</div><div><div class="ch-main">الجسم بيتكلم</div><div class="ch-sub">"لما القلب بيشيل أكتر من طاقته"</div></div></div><div class="ch-rule"></div><div class="sl">"نادي إنجليزي صغير — لاعب حس بضغط في صدره في التدريب</div><div class="sl">وقفوا التدريب كله — عملوا فحص كامل في نفس اليوم</div><div class="sl h">في مصر — رفعت كان لوحده بينفق من جيبه من غير ما حد يسأل</div><div class="sl e"></div><div class="sl">في الطب — في علم النفس — في حاجة اسمها التراكمات</div><div class="sl h">بس عارف إن واحد عاش كل ده وبعدين قلبه وقف في ملعب — مش صدفة"</div></div>
+        <div class="ch-sec" id="s7"><div class="ch-hdr"><div class="ch-num">07</div><div><div class="ch-main">11 مارس 2024</div><div class="ch-sub">"اللحظة"</div></div></div><div class="ch-rule"></div><div class="i-note">شاشة سوداء كاملة — الموسيقى بتوقف</div><div class="sl">"11 مارس 2024 — دقيقة 89</div><div class="sl">رفعت جري — مفيش تدخل — مفيش اصطدام</div><div class="sl e"></div><div class="sl d">وقع</div><div class="sl e"></div><div class="sl h">ساعتين — قلبه كان واقف</div><div class="sl e"></div><div class="sl">الناس قالت الحمد لله — ربنا كرمه</div><div class="sl">بس الرحلة الحقيقية لسه بدأت"</div></div>
+        <div class="ch-sec" id="s8"><div class="ch-hdr"><div class="ch-num">08</div><div><div class="ch-main">الشهور الأخيرة</div><div class="ch-sub">"بين المستشفى والأمل"</div></div></div><div class="ch-rule"></div><div class="sl">"قعد في المستشفى شهر — خرج — بس مش زي ما دخل</div><div class="sl e"></div><div class="sl">في يونيو 2024 ظهر على التلفزيون — قال إنه عاوز يرجع</div><div class="sl e"></div><div class="sl">بعدها بأيام — زار زملاؤه في النادي</div><div class="sl h">وكأنه كان عارف إن دي — آخر مرة هيشوفهم فيها"</div></div>
+        <div class="ch-sec" id="s9"><div class="ch-hdr"><div class="ch-num">09</div><div><div class="ch-main">قال الحقيقة</div><div class="ch-sub">"الكلام اللي مش هيتنسى"</div></div></div><div class="ch-rule"></div><div class="sl h">قال: اللي حصلي مش بس صحة</div><div class="sl h">في ناس تسببوا في اللي أنا فيه — في شخصين — عارفين نفسهم</div><div class="sl e"></div><div class="sl">مادعاش — مهجمش — مفضحش بالاسم</div><div class="sl">ده كلام راجل عاوز الحقيقة توصل — قبل ما يمشي</div><div class="sl e"></div><div class="sl">الشخص الأول اللي قصده كان واضح إنه أحمد دياب</div><div class="sl h">والشخص التاني — لسه في ضباب — والحقيقة لسه ما اتقالتش"</div></div>
+        <div class="ch-sec" id="s10"><div class="ch-hdr"><div class="ch-num">10</div><div><div class="ch-main">6 يوليو 2024</div><div class="ch-sub">"النهاية"</div></div></div><div class="ch-rule"></div><div class="i-note">شاشة سوداء — صمت 5 ثواني</div><div class="sl h">أحمد رفعت — 31 سنة — راحل عن دنيانا</div><div class="sl e"></div><div class="sl">31 سنة — مش رقم — ده إنسان</div><div class="sl h">كان عنده حلم — الحلم ده — ما اتحققش"</div></div>
+        <div class="ch-sec" id="s11"><div class="ch-hdr"><div class="ch-num">11</div><div><div class="ch-main">التحقيق والنتيجة</div><div class="ch-sub">"الحقيقة اللي ما رضّيتش حد"</div></div></div><div class="ch-rule"></div><div class="sl h">يناير 2025: سبب الوفاة خلل جيني — جلطة في الشريان التاجي</div><div class="sl h">مفيش اتهام جنائي لأشخاص بعينهم</div><div class="sl e"></div><div class="sl">وأحمد دياب؟ لسه ماشي — لسه بيتكلم في الكورة</div><div class="sl h">ومحدش حاسبه على الشهر اللي سابه فيه لوحده في الإمارات"</div></div>
+        <div class="ch-sec" id="s12"><div class="ch-hdr"><div class="ch-num">12</div><div><div class="ch-main">السؤال اللي مش هيتجاوب</div></div></div><div class="ch-rule"></div><div class="i-note">بتبص في الكاميرا مباشرة — مرة واحدة بس في الفيديو</div><div class="sl h">الخلل الجيني كان موجود من يوم ما اتولد</div><div class="sl h">طب والضغط النفسي — ده من ساعت ما اتولد برده؟</div><div class="sl e"></div><div class="sl h">"لو ابنك — أو أخوك — كان في مكان رفعت — كنت هتقبل؟"</div><div class="sl h">هل ده مقبول؟"</div></div>
+        <div class="ch-sec" id="s13"><div class="ch-hdr"><div class="ch-num">13</div><div><div class="ch-main">كلام لأشخاص بعينهم</div></div></div><div class="ch-rule"></div><div class="i-note">النبرة مختلفة — مباشرة — هادية بس واضحة</div><div class="sl">"هتكلم لحد معين</div><div class="sl e"></div><div class="sl d">سيادة أحمد دياب</div><div class="sl e"></div><div class="sl">أنت اللي قلتله الأوراق تمام — أنت اللي سبته — أنت اللي تسببت بعقوبة</div><div class="sl h">بتعرف تنام؟ — بجد — بتعرف تنام؟</div><div class="sl e"></div><div class="sl">لأن في ناس بتصحى الصبح وبتفكر في أحمد رفعت</div><div class="sl h">وأنت — اللي كنت المفروض تحميه — بتفكر في إيه؟</div><div class="sl e"></div><div class="i-note">صمت 3 ثواني</div><div class="sl e"></div><div class="sl">الضمير بيصحى معاك كل يوم — وبينام معاك كل ليلة</div><div class="sl h">وملقوش حد يهرب منه"</div><div class="sl e"></div><div class="sl h">"وأنتوا — عرفتوا ده — واخترتوا تنسوه"</div></div>
+        <div class="ch-sec" id="s14"><div class="ch-hdr"><div class="ch-num">14</div><div><div class="ch-main">النظام المكسور</div></div></div><div class="ch-rule"></div><div class="tl-box"><div class="tl-row"><div class="tl-d">مارس 2022</div><div class="tl-e">وعدوه إن الأوراق تمام</div></div><div class="tl-row"><div class="tl-d">مايو 2022</div><div class="tl-e">سافر</div></div><div class="tl-row"><div class="tl-d">يوليو 2022</div><div class="tl-e">اكتشف إن خروجه غير قانوني</div></div><div class="tl-row"><div class="tl-d">أغسطس 2022</div><div class="tl-e">فسخوا تعاقده</div></div><div class="tl-row"><div class="tl-d">سبتمبر 2022</div><div class="tl-e">رجع مصر من جيبه</div></div><div class="tl-row"><div class="tl-d">أكتوبر 2022</div><div class="tl-e">إيقاف 6 أشهر</div></div><div class="tl-row"><div class="tl-d">مارس 2024</div><div class="tl-e">قلبه وقف</div></div><div class="tl-row"><div class="tl-d">يوليو 2024</div><div class="tl-e">راحل</div></div></div><div class="sl h">النظام مش بيحميهم — النظام بيستخدمهم</div><div class="sl h">وأحمد رفعت — كان مثال حي على ده"</div></div>
+        <div class="outro" id="s15"><div class="i-note" style="text-align:center;border:none;color:#2a2a2a;margin-bottom:26px;">بيانو بس — أبطأ حاجة في الفيديو</div><div class="sl" style="text-align:center">"راح — وبعده — مفيش حاجة اتغيرت</div><div class="sl h" style="text-align:center">لأن الصمت — هو اللي بيحمي الغلط</div><div class="sl e"></div><div class="sl" style="text-align:center">"ربنا يرحمك يا أحمد</div><div class="sl h" style="text-align:center">عشت بشرف — وده وحده — أشجع من أي هدف في أي ماتش"</div><div class="sl e"></div><div class="outro-name">أحمد رفعت</div><div class="outro-years">1993 — 2024</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ DYNAMIC VIEWER ══ -->
+<div class="modal" id="dynModal">
+  <div class="modal-bg"></div>
+  <div class="modal-panel">
+    <div class="m-bar">
+      <div class="m-bar-l">
+        <button class="m-back" onclick="closeModal('dynModal')">← رجوع</button>
+        <div class="m-sep"></div>
+        <div class="m-bc">الأرشيف <span>/</span> <span id="dynBC">—</span></div>
+      </div>
+      <div class="m-bar-r">
+        <div class="m-tag" id="dynTag">—</div>
+        <button class="btn-x" onclick="closeModal('dynModal')">✕</button>
+      </div>
+    </div>
+    <div class="m-layout">
+      <div class="m-content" id="dynContent" style="padding:55px 65px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ LOCKED MODAL ══ -->
+<div class="locked-modal" id="lockedModal">
+  <div class="locked-bg" onclick="closeModal('lockedModal')"></div>
+  <div class="locked-box">
+    <div class="locked-icon">🔒</div>
+    <div class="locked-title-label">محتوى مدفوع</div>
+    <div class="locked-script-title" id="lockedTitle">—</div>
+    <div class="locked-desc">السكريبت ده متاح للمشتركين فقط<br>تواصل مع صاحب الموقع للحصول على الوصول</div>
+    <button class="locked-close" onclick="closeModal('lockedModal')">حسناً</button>
+  </div>
+</div>
+
+<!-- ══ ADD MODAL ══ -->
+<div class="add-modal" id="addModal">
+  <div class="add-modal-bg" onclick="closeAddModal()"></div>
+  <div class="add-box">
+    <div class="add-box-hdr">
+      <div>
+        <div class="add-box-title">إضافة سكريبت جديد</div>
+        <div class="add-box-sub">أدمن فقط</div>
+      </div>
+      <button class="btn-x" onclick="closeAddModal()">✕</button>
+    </div>
+    <div class="add-box-body">
+      <!-- THUMBNAIL -->
+      <div>
+        <label class="flbl">صورة مصغرة — Thumbnail</label>
+        <div class="thumb-up" onclick="document.getElementById('fileInput').click()">
+          <div class="thumb-up-placeholder">
+            <div class="thumb-up-icon">🖼</div>
+            <div class="thumb-up-txt">اضغط لرفع صورة</div>
+            <div class="thumb-up-hint">JPG · PNG · 16:9 مثالي</div>
+          </div>
+          <img id="thumbPreview" src="" alt="">
+          <button id="thumbRemoveBtn" onclick="removeThumbnail(event)">✕ إزالة</button>
+        </div>
+        <input type="file" id="fileInput" accept="image/*" onchange="handleThumb(event)">
+      </div>
+      <!-- TITLE -->
+      <div>
+        <label class="flbl">عنوان الفيديو</label>
+        <input class="finput" id="fTitle" placeholder="مثال: قصة الديربي المصري">
+      </div>
+      <!-- CAT + DUR -->
+      <div class="frow2">
+        <div>
+          <label class="flbl">التصنيف</label>
+          <select class="fselect" id="fCat">
+            <option value="وثائقي">وثائقي</option>
+            <option value="تحليل">تحليل</option>
+            <option value="تاريخ">تاريخ</option>
+          </select>
+        </div>
+        <div>
+          <label class="flbl">مدة الفيديو</label>
+          <input class="finput" id="fDur" placeholder="مثال: 12 دقيقة">
+        </div>
+      </div>
+      <!-- PREMIUM TOGGLE -->
+      <div class="premium-toggle">
+        <input type="checkbox" id="fPremium">
+        <label for="fPremium">🔒 محتوى مدفوع — <span>المشتركون فقط يشوفوه</span></label>
+      </div>
+      <!-- SCRIPT -->
+      <div>
+        <label class="flbl">السكريبت كامل</label>
+        <textarea class="ftextarea" id="fScript" placeholder="الصق السكريبت هنا..."></textarea>
+      </div>
+    </div>
+    <div class="add-box-footer">
+      <div class="spinner" id="savingSpinner"></div>
+      <button class="btn-cancel" onclick="closeAddModal()">إلغاء</button>
+      <button class="btn-save" onclick="saveScript()">حفظ السكريبت ✓</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// Show/hide login wall based on auth
+const origUpdateAuthUI = window.updateAuthUI;
+document.addEventListener('DOMContentLoaded', () => {
+  // show add card for admin only
+  const observer = new MutationObserver(() => {
+    const isAdm = document.getElementById('adminBadge')?.style.display !== 'none';
+    const addCardBtn = document.getElementById('addCardBtn');
+    if (addCardBtn) addCardBtn.style.display = isAdm ? '' : 'none';
+  });
+  const badge = document.getElementById('adminBadge');
+  if (badge) observer.observe(badge, { attributes: true, attributeFilter: ['style'] });
+});
+</script>
+
+</body>
+</html>
