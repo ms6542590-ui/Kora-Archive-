@@ -44,31 +44,41 @@ onAuthStateChanged(auth, async (user) => {
   currentUser = user;
   isAdmin = user?.email === ADMIN_EMAIL;
   updateAuthUI();
-  if (user) loadScripts();
-  else { allScripts = []; renderGrid(); }
+  if (user) {
+    loadScripts();
+  } else {
+    allScripts = [];
+    renderGrid();
+    // Show login wall only if not in middle of redirect
+    const pendingRedirect = sessionStorage.getItem('pendingRedirect');
+    if (!pendingRedirect) {
+      document.getElementById('loginWall').classList.add('show');
+    }
+  }
 });
 
 // SIGN IN — handle redirect result first
 getRedirectResult(auth).then((result) => {
+  sessionStorage.removeItem('pendingRedirect');
   if (result?.user) {
     currentUser = result.user;
     isAdmin = currentUser.email === ADMIN_EMAIL;
     updateAuthUI();
     loadScripts();
+    document.getElementById('loginWall').classList.remove('show');
   }
 }).catch((e) => {
+  sessionStorage.removeItem('pendingRedirect');
   console.error(e);
-  showToast('حدث خطأ في تسجيل الدخول');
 });
 
 window.signIn = async () => {
   try {
-    // try popup first, fallback to redirect
-    await signInWithPopup(auth, provider);
+    sessionStorage.setItem('pendingRedirect', '1');
+    await signInWithRedirect(auth, provider);
   } catch(e) {
-    // if popup blocked, use redirect
-    try { await signInWithRedirect(auth, provider); }
-    catch(e2) { showToast('حدث خطأ في تسجيل الدخول'); }
+    sessionStorage.removeItem('pendingRedirect');
+    showToast('حدث خطأ في تسجيل الدخول');
   }
 };
 
@@ -97,6 +107,8 @@ function updateAuthUI() {
     userName.textContent = currentUser.displayName?.split(' ')[0] || 'مرحباً';
     addBtn.style.display = isAdmin ? 'block' : 'none';
     adminBadge.style.display = isAdmin ? 'block' : 'none';
+    document.getElementById('loginWall').classList.remove('show');
+    document.getElementById('grid').style.display = '';
   } else {
     loginBtn.style.display  = 'block';
     userArea.style.display  = 'none';
@@ -608,7 +620,7 @@ footer{border-top:1px solid var(--border);padding:26px 50px;display:flex;align-i
     </div>
   </div>
   <div class="nav-right">
-    <div class="nav-stat"><strong id="navCount">1</strong>سكريبت</div>
+    <div class="nav-stat"><strong id="navCount">2</strong>سكريبت</div>
     <div class="nav-div"></div>
 
 ```
@@ -671,7 +683,7 @@ footer{border-top:1px solid var(--border);padding:26px 50px;display:flex;align-i
       <div class="card-cat-label">كورة محلية · وثائقي</div>
       <div class="card-main-title">اللاعب اللي ما خلوهوش يكمل — قصة أحمد رفعت</div>
       <div class="card-foot">
-        <div class="card-meta"><span>14 chapter</span> · <span>+15 دقيقة</span></div>
+        <div class="card-meta"><span>14 chapter</span></div>
         <div class="card-arr">↗</div>
       </div>
     </div>
@@ -680,6 +692,53 @@ footer{border-top:1px solid var(--border);padding:26px 50px;display:flex;align-i
   <!-- DYNAMIC CARDS INJECT HERE -->
 
   <div id="dynCards" style="display:contents;"></div>
+
+  <!-- SUPER LEAGUE CARD -->
+
+  <div class="card" data-cat="تحليل" onclick="openSuperLeague()" style="animation-delay:0.2s">
+    <div class="card-thumb" style="position:relative;">
+      <div style="position:absolute;inset:0;background:#050508;overflow:hidden;">
+        <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.025) 1px,transparent 1px);background-size:50px 50px;"></div>
+        <div style="position:absolute;width:400px;height:400px;right:-80px;top:50%;transform:translateY(-50%);background:radial-gradient(circle,rgba(184,149,63,0.2) 0%,transparent 70%);"></div>
+        <div style="position:absolute;width:300px;height:300px;left:-60px;top:50%;transform:translateY(-50%);background:radial-gradient(circle,rgba(155,35,53,0.18) 0%,transparent 70%);"></div>
+        <div style="position:absolute;left:14px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:6px;width:140px;">
+          <div style="background:rgba(184,149,63,0.1);border:1px solid rgba(184,149,63,0.25);padding:7px 10px;">
+            <div style="font-size:7px;letter-spacing:2px;color:rgba(255,255,255,0.35);margin-bottom:3px;font-family:Cairo,sans-serif;">شامبيونز ليج</div>
+            <div style="font-size:20px;font-weight:900;color:#b8953f;font-family:serif;font-style:italic;">€40M</div>
+            <div style="font-size:6.5px;color:rgba(255,255,255,0.3);font-family:Cairo,sans-serif;">لو خرجت بدري</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:4px;padding:0 4px;">
+            <div style="flex:1;height:1px;background:rgba(255,255,255,0.08);"></div>
+            <div style="font-size:8px;color:rgba(255,255,255,0.2);letter-spacing:2px;font-weight:700;">VS</div>
+            <div style="flex:1;height:1px;background:rgba(255,255,255,0.08);"></div>
+          </div>
+          <div style="background:rgba(155,35,53,0.1);border:1px solid rgba(155,35,53,0.3);padding:7px 10px;">
+            <div style="font-size:7px;letter-spacing:2px;color:rgba(255,255,255,0.35);margin-bottom:3px;font-family:Cairo,sans-serif;">السوبر ليج</div>
+            <div style="font-size:20px;font-weight:900;color:#c0392b;font-family:serif;font-style:italic;">€300M</div>
+            <div style="font-size:6.5px;color:rgba(255,255,255,0.3);font-family:Cairo,sans-serif;">مضمونة — بدون شرط</div>
+          </div>
+        </div>
+        <div style="position:absolute;left:162px;top:8%;bottom:8%;width:1px;background:linear-gradient(to bottom,transparent,rgba(255,255,255,0.06) 30%,rgba(255,255,255,0.06) 70%,transparent);"></div>
+        <div style="position:absolute;right:14px;top:50%;transform:translateY(-50%);text-align:right;direction:rtl;">
+          <div style="font-size:7px;letter-spacing:4px;color:rgba(184,149,63,0.7);margin-bottom:8px;font-family:Cairo,sans-serif;">تحليل · كورة عالمية</div>
+          <div style="font-size:28px;font-weight:900;color:#f0ebe3;line-height:1.1;font-family:Cairo,sans-serif;">أين ذهبت<br><span style="color:#b8953f;">السوبر</span><br>ليج؟</div>
+          <div style="font-size:7px;color:rgba(255,255,255,0.25);margin-top:8px;letter-spacing:2px;font-family:Cairo,sans-serif;">FIFA · Perez · المليارات</div>
+        </div>
+        <div style="position:absolute;bottom:0;left:0;right:0;height:3px;background:linear-gradient(to right,#b8953f,#d4af6a,#b8953f);"></div>
+      </div>
+      <div class="thumb-badge badge-analysis" style="z-index:3;">تحليل</div>
+      <div class="thumb-dur" style="z-index:3;">+10 دقايق</div>
+      <div class="card-ov"><div class="open-btn">↗</div></div>
+    </div>
+    <div class="card-body">
+      <div class="card-cat-label">كورة عالمية · تحليل</div>
+      <div class="card-main-title">أين ذهبت السوبر ليج؟ — الفيفا والفلوس والفساد</div>
+      <div class="card-foot">
+        <div class="card-meta"><span>8 chapter</span></div>
+        <div class="card-arr">↗</div>
+      </div>
+    </div>
+  </div>
 
   <!-- ADD CARD (admin only, shown via JS) -->
 
@@ -888,6 +947,166 @@ document.addEventListener('DOMContentLoaded', () => {
   const badge = document.getElementById('adminBadge');
   if (badge) observer.observe(badge, { attributes: true, attributeFilter: ['style'] });
 });
+</script>
+
+<!-- SUPER LEAGUE MODAL -->
+
+<div class="modal" id="slModal">
+  <div class="modal-bg"></div>
+  <div class="modal-panel">
+    <div class="m-bar">
+      <div class="m-bar-l">
+        <button class="m-back" onclick="closeSLModal()">← رجوع</button>
+        <div class="m-sep"></div>
+        <div class="m-bc">الأرشيف <span>/</span> أين ذهبت السوبر ليج؟</div>
+      </div>
+      <div class="m-bar-r">
+        <div class="m-tag">تحليل</div>
+        <button class="btn-x" onclick="closeSLModal()">✕</button>
+      </div>
+    </div>
+    <div class="m-layout">
+      <div class="m-sidebar">
+        <div class="sb-lbl">محتوى السكريبت</div>
+        <div class="si active" onclick="slGoTo('sl0',0)"><span class="si-n">—</span><span class="si-t">INTRO</span></div>
+        <div class="si" onclick="slGoTo('sl1',1)"><span class="si-n">01</span><span class="si-t">الكورة بقت بيزنس</span></div>
+        <div class="si" onclick="slGoTo('sl2',2)"><span class="si-n">02</span><span class="si-t">الفيفا بتجمع كام؟</span></div>
+        <div class="si" onclick="slGoTo('sl3',3)"><span class="si-n">03</span><span class="si-t">الشامبيونز ليج</span></div>
+        <div class="si" onclick="slGoTo('sl4',4)"><span class="si-n">04</span><span class="si-t">الفساد بالأسامي</span></div>
+        <div class="si" onclick="slGoTo('sl5',5)"><span class="si-n">05</span><span class="si-t">الأندية اللي ماتت</span></div>
+        <div class="si" onclick="slGoTo('sl6',6)"><span class="si-n">06</span><span class="si-t">إزاي كانت هتشتغل</span></div>
+        <div class="si" onclick="slGoTo('sl7',7)"><span class="si-n">07</span><span class="si-t">48 ساعة</span></div>
+        <div class="si" onclick="slGoTo('sl8',8)"><span class="si-n">08</span><span class="si-t">بيريز في المحاكم</span></div>
+        <div class="si" onclick="slGoTo('sl9',9)"><span class="si-n">—</span><span class="si-t">الخاتمة</span></div>
+      </div>
+      <div class="m-content" id="slContent">
+        <div class="sc-hero" id="sl0">
+          <div class="sc-ep">سكريبت #002</div>
+          <div class="sc-name">أين ذهبت السوبر ليج؟</div>
+          <div class="sc-badges"><span class="bdg g">+10 دقايق</span><span class="bdg">8 Chapter</span><span class="bdg">تحليل</span></div>
+        </div>
+        <div class="ch-sec">
+          <div class="ch-hdr"><div class="ch-num">00</div><div><div class="ch-main">INTRO</div></div></div>
+          <div class="ch-rule"></div>
+          <div class="i-note">ابدأ بالسؤال مباشرة — بدون مقدمة</div>
+          <div class="sl">"نادي زي ريال مدريد أو ليفربول</div>
+          <div class="sl">بياخد من الشامبيونز ليج حوالي 100 مليون يورو في الموسم — لو كسب</div>
+          <div class="sl">بيريز قالهم: أنا هديكم 300 لـ 400 مليون مضمونة كل سنة</div>
+          <div class="sl h">حتى لو خسرتوا — حتى لو ما اتأهلتوش</div>
+          <div class="sl h">الأندية قالت أيوه — والدنيا اتقلبت في 48 ساعة</div>
+          <div class="sl">دي قصة السوبر ليج"</div>
+        </div>
+        <div class="ch-sec" id="sl1">
+          <div class="ch-hdr"><div class="ch-num">01</div><div><div class="ch-main">الكورة بقت بيزنس</div></div></div>
+          <div class="ch-rule"></div>
+          <div class="sl">"في التسعينيات حصل تحول غيّر كل حاجة</div>
+          <div class="sl">حقوق البث — الرعاة — المنصات</div>
+          <div class="sl">فجأة الكورة بقت صناعة بمئات المليارات</div>
+          <div class="sl h">وأي صناعة بالمليارات بتجذب ناس عندهم علاقة بالفلوس بس"</div>
+        </div>
+        <div class="ch-sec" id="sl2">
+          <div class="ch-hdr"><div class="ch-num">02</div><div><div class="ch-main">الفيفا بتجمع كام؟</div></div></div>
+          <div class="ch-rule"></div>
+          <div class="sl h">"كأس العالم قطر 2022 وحده — الفيفا جمعت 7.57 مليار دولار</div>
+          <div class="sl">3.4 مليار من البث — 1.8 مليار من الرعاة</div>
+          <div class="sl h">7.5 مليار — في 4 سنين — من بطولة واحدة"</div>
+          <div class="sl e"></div>
+          <div class="sl">"كل اتحاد من 211 بياخد مليون دولار في السنة</div>
+          <div class="sl h">مليون — من ميزانية 7.5 مليار — أقل من 0.1%</div>
+          <div class="sl">والفيفا عندها 2.9 مليار دولار احتياطي في البنك"</div>
+        </div>
+        <div class="ch-sec" id="sl3">
+          <div class="ch-hdr"><div class="ch-num">03</div><div><div class="ch-main">الشامبيونز ليج — الأندية بتاخد كام؟</div></div></div>
+          <div class="ch-rule"></div>
+          <div class="sl h">"PSG فازوا بالشامبيونز ليج 2025 — أخدوا 144 مليون يورو</div>
+          <div class="sl">نص النهائي — 120 مليون · ربع النهائي — 100 مليون</div>
+          <div class="sl">خرج من الدور الأول — 40 لـ 50 مليون</div>
+          <div class="sl e"></div>
+          <div class="sl h">مانشستر سيتي بياخدوا 45 مليون إضافية قبل ما يلعبوا ماتش واحد</div>
+          <div class="sl">النظام متصمم إنه يخلي الكبير يفضل كبير دايماً"</div>
+        </div>
+        <div class="ch-sec" id="sl4">
+          <div class="ch-hdr"><div class="ch-num">04</div><div><div class="ch-main">الفساد بالأسامي</div></div></div>
+          <div class="ch-rule"></div>
+          <div class="sl h">"سيب بلاتر — رئيس الفيفا 17 سنة</div>
+          <div class="sl">في 2011 أمر بدفع 2 مليون فرنك من فلوس الفيفا لميشيل بلاتيني</div>
+          <div class="sl">اشترى أصوات الانتخابات بفلوس الكورة نفسها</div>
+          <div class="sl h">اتحظر من الكورة — ما اتحبسش يوم واحد"</div>
+          <div class="sl e"></div>
+          <div class="sl h">"جاك وارنر — 35 اتحاد في إيده — رشاوي أكتر من 11 مليون دولار</div>
+          <div class="sl">هرب لترينيداد — ولا يزال طليقاً حتى دلوقتي"</div>
+          <div class="sl e"></div>
+          <div class="sl d">"الـ 10 مليون رشوة مونديال جنوب أفريقيا — جات من فلوس الفيفا نفسها</div>
+          <div class="sl d">سرقوا فلوس جنوب أفريقيا — عشان يرشوا بيها جنوب أفريقيا"</div>
+        </div>
+        <div class="ch-sec" id="sl5">
+          <div class="ch-hdr"><div class="ch-num">05</div><div><div class="ch-main">الأندية اللي دفعت الفاتورة</div></div></div>
+          <div class="ch-rule"></div>
+          <div class="sl">"بارما الإيطالي — نادي كان عنده بوفون وكانافارو وكريسبو</div>
+          <div class="sl h">أُعلن إفلاسه 2004 — ورجع من الدوري الرابع من الصفر"</div>
+          <div class="sl e"></div>
+          <div class="sl">"جيروندان بوردو — نادي زيدان — 6 ألقاب فرنسية</div>
+          <div class="sl h">في 2024 — أُعلن إنه مش هيكمل كنادي محترف"</div>
+          <div class="sl e"></div>
+          <div class="sl h">"أكتر من 60 نادي أوروبي أفلسوا في آخر 20 سنة</div>
+          <div class="sl">الفلوس بتتركز في الأعلى — والأسفل بيجري ورا الفتات"</div>
+        </div>
+        <div class="ch-sec" id="sl6">
+          <div class="ch-hdr"><div class="ch-num">06</div><div><div class="ch-main">السوبر ليج — إزاي كانت هتشتغل؟</div></div></div>
+          <div class="ch-rule"></div>
+          <div class="sl h">"20 نادي — 15 مؤسس ثابتين — ما بينزلوش أبداً</div>
+          <div class="sl">مجموعتين — 18 ماتش — بلايوف — ربع ونص ونهائي"</div>
+          <div class="sl e"></div>
+          <div class="sl">"في الشامبيونز ليج لو خرجت بدري — بتاخد 40 مليون</div>
+          <div class="sl h">في السوبر ليج حتى لو خسرت كل ماتشاتك — ضامن 300 مليون</div>
+          <div class="sl h">ده الفرق اللي خلى الأندية توقع في ثانية"</div>
+        </div>
+        <div class="ch-sec" id="sl7">
+          <div class="ch-hdr"><div class="ch-num">07</div><div><div class="ch-main">48 ساعة هدّت الحلم</div></div></div>
+          <div class="ch-rule"></div>
+          <div class="i-note">18 أبريل 2021</div>
+          <div class="sl">"في ليلة واحدة — 12 نادي أعلنوا السوبر ليج</div>
+          <div class="sl h">الفيفا والويفا هددوا بحظر اللاعبين من كأس العالم</div>
+          <div class="sl">وبعد 48 ساعة — الأندية الإنجليزية الستة انسحبت"</div>
+        </div>
+        <div class="ch-sec" id="sl8">
+          <div class="ch-hdr"><div class="ch-num">08</div><div><div class="ch-main">بيريز في المحاكم</div></div></div>
+          <div class="ch-rule"></div>
+          <div class="sl">"بيريز راح للمحاكم الأوروبية</div>
+          <div class="sl h">وفي 2023 — محكمة العدل الأوروبية قررت</div>
+          <div class="sl">إن الفيفا والويفا مش عندهم حق يمنعوا مشاريع بديلة بالقوة</div>
+          <div class="sl">الفكرة لسه حية"</div>
+        </div>
+        <div class="outro" id="sl9">
+          <div class="i-note" style="text-align:center;border:none;color:#2a2a2a;margin-bottom:26px;">الخاتمة</div>
+          <div class="sl h" style="text-align:center">"أنت كجمهور — بتدفع تذاكر وبتشتري قمصان وبتشوف إعلانات</div>
+          <div class="sl h" style="text-align:center">أنت جزء من الماكينة دي</div>
+          <div class="sl e"></div>
+          <div class="sl h" style="text-align:center">السؤال: هل الجماهير عايزوها ترجع فعلاً؟</div>
+          <div class="sl" style="text-align:center">قولنا في الكومنتات"</div>
+          <div class="sl e"></div>
+          <div class="outro-name" style="font-size:2rem;">أين ذهبت السوبر ليج؟</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function openSuperLeague() {
+  document.getElementById('slModal').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeSLModal() {
+  document.getElementById('slModal').classList.remove('open');
+  document.body.style.overflow = '';
+}
+function slGoTo(id, idx) {
+  const el = document.getElementById(id);
+  const mc = document.getElementById('slContent');
+  if (el && mc) mc.scrollTo({ top: el.offsetTop - 20, behavior: 'smooth' });
+  document.querySelectorAll('#slModal .si').forEach((s,i) => s.classList.toggle('active', i===idx));
+}
 </script>
 
 </body>
